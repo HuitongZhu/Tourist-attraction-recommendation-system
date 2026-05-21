@@ -1,0 +1,976 @@
+<!DOCTYPE html>
+<html lang="zh-CN" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>旅游景点推荐系统 - 管理员中心</title>
+    <link rel="stylesheet" href="https://cdn.staticfile.org/layui/2.9.10/css/layui.css">
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: "微软雅黑", sans-serif;
+            background-color: #fafbfc;
+        }
+        .top-nav {
+            background-color: #fff;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 999;
+        }
+        .nav-container {
+            width: 1200px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            height: 60px;
+        }
+        .nav-logo {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .logo-text {
+            font-size: 18px;
+            font-weight: bold;
+            color: #1a56db;
+        }
+        .nav-user {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+        .nav-link {
+            text-decoration: none;
+            color: #333;
+            font-size: 14px;
+            font-weight: 500;
+        }
+        .nav-link:hover, .nav-link.active {
+            color: #1a56db;
+        }
+        .nav-btn {
+            padding: 6px 14px;
+            border-radius: 4px;
+            font-size: 12px;
+            cursor: pointer;
+            border: none;
+            text-decoration: none;
+        }
+        .logout-btn {
+            background-color: #fff;
+            color: #1a56db;
+            border: 1px solid #1a56db;
+        }
+        .center-container {
+            width: 1200px;
+            margin: 80px auto 30px;
+            display: flex;
+            gap: 20px;
+            min-height: calc(100vh - 170px);
+        }
+        .left-sidebar {
+            width: 220px;
+            background-color: #fff;
+            border-radius: 8px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.05);
+            padding: 20px 0;
+        }
+        .sidebar-title {
+            font-size: 16px;
+            font-weight: bold;
+            color: #333;
+            padding: 0 20px 12px;
+            border-bottom: 1px solid #f0f0f0;
+            margin-bottom: 15px;
+        }
+        .sidebar-menu {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+        .sidebar-item {
+            padding: 12px 20px;
+            color: #333;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 14px;
+        }
+        .sidebar-item:hover {
+            background-color: #f0f5ff;
+            color: #1a56db;
+        }
+        .sidebar-item.active {
+            background-color: #1a56db;
+            color: #fff;
+        }
+        .sidebar-icon {
+            font-size: 16px;
+        }
+        .main-content {
+            flex: 1;
+            background-color: #fff;
+            border-radius: 8px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.05);
+            padding: 25px;
+        }
+        .page-title {
+            font-size: 18px;
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 20px;
+        }
+        .search-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        .search-group {
+            display: flex;
+            gap: 10px;
+        }
+        .search-input {
+            width: 300px;
+            padding: 8px 12px;
+            border: 1px solid #e0e0e0;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        .search-btn {
+            padding: 8px 20px;
+            background-color: #1a56db;
+            color: #fff;
+            border: none;
+            border-radius: 4px;
+            font-size: 14px;
+            cursor: pointer;
+        }
+        .search-btn:hover {
+            background-color: #1543a0;
+        }
+        .filter-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .filter-select {
+            padding: 8px 12px;
+            border: 1px solid #e0e0e0;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        .user-list, .landscape-list, .post-list {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+        .user-card, .landscape-card, .post-card {
+            padding: 20px;
+            border: 1px solid #f0f0f0;
+            border-radius: 8px;
+            background-color: #fafafa;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .user-info {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+        }
+        .user-avatar-lg {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            background-color: #1a56db;
+            color: #fff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+            font-weight: bold;
+        }
+        .user-details {
+            flex: 1;
+        }
+        .user-username {
+            font-size: 16px;
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 5px;
+        }
+        .user-meta {
+            font-size: 12px;
+            color: #999;
+            display: flex;
+            gap: 20px;
+        }
+        .user-actions, .landscape-actions, .post-actions {
+            display: flex;
+            gap: 10px;
+        }
+        .action-btn {
+            padding: 6px 16px;
+            border: none;
+            border-radius: 4px;
+            font-size: 12px;
+            cursor: pointer;
+        }
+        .view-btn {
+            background-color: #1a56db;
+            color: #fff;
+        }
+        .delete-btn {
+            background-color: #ff4d4f;
+            color: #fff;
+        }
+        .pass-btn {
+            background-color: #52c41a;
+            color: #fff;
+        }
+        .reject-btn {
+            background-color: #ff4d4f;
+            color: #fff;
+        }
+        .pagination {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 10px;
+            margin-top: 30px;
+        }
+        .page-btn {
+            width: 32px;
+            height: 32px;
+            border: 1px solid #e0e0e0;
+            border-radius: 4px;
+            background-color: #fff;
+            cursor: pointer;
+        }
+        .page-btn:hover:not(:disabled) {
+            background-color: #f0f5ff;
+            border-color: #1a56db;
+        }
+        .page-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        .page-current {
+            width: 32px;
+            height: 32px;
+            background-color: #1a56db;
+            color: #fff;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+        }
+        .landscape-header, .post-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 10px;
+        }
+        .landscape-title, .post-title {
+            font-size: 16px;
+            font-weight: bold;
+            color: #333;
+        }
+        .landscape-meta, .post-meta {
+            font-size: 12px;
+            color: #999;
+            margin-bottom: 10px;
+            display: flex;
+            gap: 20px;
+        }
+        .landscape-content, .post-content {
+            font-size: 14px;
+            color: #666;
+            line-height: 1.6;
+            margin-bottom: 15px;
+            display: -webkit-box;
+            -webkit-line-clamp: 3;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+        .audit-tag {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+        .audit-tag.pending {
+            background-color: #fff7e6;
+            color: #fa8c16;
+        }
+        .audit-tag.approved {
+            background-color: #f6ffed;
+            color: #52c41a;
+        }
+        .audit-tag.rejected {
+            background-color: #fff2f0;
+            color: #ff4d4f;
+        }
+        .content-view {
+            display: none;
+        }
+        .content-view.active {
+            display: block;
+        }
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #999;
+        }
+        .landscape-card, .post-card {
+            flex-direction: column;
+            align-items: flex-start;
+        }
+        .profile-card {
+            background: #fff;
+            border-radius: 12px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+            overflow: hidden;
+        }
+        .profile-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 30px;
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+        .profile-avatar {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.2);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 32px;
+            color: #fff;
+            font-weight: bold;
+        }
+        .profile-name h2 {
+            color: #fff;
+            margin: 0 0 5px 0;
+            font-size: 24px;
+        }
+        .profile-name p {
+            color: rgba(255,255,255,0.8);
+            margin: 0;
+            font-size: 14px;
+        }
+        .profile-info {
+            padding: 20px 30px;
+        }
+        .info-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px 0;
+            border-bottom: 1px solid #f0f0f0;
+        }
+        .info-row:last-child {
+            border-bottom: none;
+        }
+        .info-label {
+            font-size: 14px;
+            color: #999;
+        }
+        .info-value {
+            font-size: 14px;
+            color: #333;
+            font-weight: 500;
+        }
+        .info-value.active-status {
+            color: #52c41a;
+        }
+        .modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .modal-content {
+            background: #fff;
+            border-radius: 12px;
+            width: 400px;
+            max-width: 90%;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+        }
+        .modal-header {
+            padding: 20px 25px;
+            border-bottom: 1px solid #f0f0f0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .modal-header h3 {
+            margin: 0;
+            font-size: 18px;
+            color: #333;
+        }
+        .modal-close {
+            font-size: 24px;
+            color: #999;
+            cursor: pointer;
+            line-height: 1;
+        }
+        .modal-close:hover {
+            color: #333;
+        }
+        .modal-body {
+            padding: 25px;
+        }
+        .modal-footer {
+            padding: 15px 25px;
+            border-top: 1px solid #f0f0f0;
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+        }
+        .btn-cancel {
+            padding: 10px 20px;
+            border: 1px solid #e8e8e8;
+            background: #fff;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        .btn-save {
+            padding: 10px 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #fff;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        .action-btn.edit-btn {
+            background: #1890ff;
+            color: #fff;
+        }
+        .action-btn.edit-btn:hover {
+            background: #40a9ff;
+        }
+        .modal-content-large {
+            background: #fff;
+            border-radius: 12px;
+            width: 500px;
+            max-width: 90%;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+        .form-row {
+            margin-bottom: 15px;
+        }
+        .form-row label {
+            display: block;
+            font-size: 14px;
+            color: #666;
+            margin-bottom: 8px;
+            font-weight: 500;
+        }
+        .form-select {
+            width: 100%;
+            padding: 12px 15px;
+            border: 1px solid #e8e8e8;
+            border-radius: 8px;
+            font-size: 14px;
+            box-sizing: border-box;
+            background: #fff;
+        }
+        .form-select:focus {
+            outline: none;
+            border-color: #1890ff;
+        }
+    </style>
+</head>
+<body>
+    <div class="top-nav">
+        <div class="nav-container">
+            <div class="nav-logo">
+                <span class="logo-text">旅游景点推荐系统</span>
+            </div>
+            <div class="nav-user">
+                <a href="/admin" class="nav-link active">管理员中心</a>
+                <a href="/logout" class="nav-btn logout-btn">退出登录</a>
+            </div>
+        </div>
+    </div>
+
+    <div class="center-container">
+        <div class="left-sidebar">
+            <div class="sidebar-title">管理系统功能</div>
+            <ul class="sidebar-menu">
+                <li class="sidebar-item" onclick="switchView('profile')">
+                    <span class="sidebar-icon"><i class="layui-icon layui-icon-face"></i></span>
+                    <span>个人信息</span>
+                </li>
+                <li class="sidebar-item active" onclick="switchView('user-management')">
+                    <span class="sidebar-icon"><i class="layui-icon layui-icon-user"></i></span>
+                    <span>用户账号管理</span>
+                </li>
+                <li class="sidebar-item" onclick="switchView('landscape-audit')">
+                    <span class="sidebar-icon"><i class="layui-icon layui-icon-map"></i></span>
+                    <span>审核景点信息</span>
+                </li>
+                <li class="sidebar-item" onclick="switchView('post-audit')">
+                    <span class="sidebar-icon"><i class="layui-icon layui-icon-edit"></i></span>
+                    <span>审核推荐帖</span>
+                </li>
+            </ul>
+        </div>
+
+        <div class="main-content">
+            <div id="profile" class="content-view">
+                <h3 class="page-title">个人信息</h3>
+                <div style="max-width: 500px;">
+                    <div class="profile-card">
+                        <div class="profile-header">
+                            <div class="profile-avatar">
+                                <span th:text="${#strings.substring(adminUser.userName, 0, 1)}">管</span>
+                            </div>
+                            <div class="profile-name">
+                                <h2 th:text="${adminUser.userName}">管理员</h2>
+                                <p>管理员账号</p>
+                            </div>
+                        </div>
+                        <div class="profile-info">
+                            <div class="info-row">
+                                <span class="info-label">用户ID</span>
+                                <span class="info-value" th:text="${adminUser.userId}"></span>
+                            </div>
+                            <div class="info-row">
+                                <span class="info-label">用户名</span>
+                                <span class="info-value" th:text="${adminUser.userName}"></span>
+                            </div>
+                            <div class="info-row">
+                                <span class="info-label">用户类型</span>
+                                <span class="info-value">管理员</span>
+                            </div>
+                            <div class="info-row">
+                                <span class="info-label">账号状态</span>
+                                <span class="info-value active-status">正常</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="user-management" class="content-view active">
+                <h3 class="page-title">用户信息</h3>
+                <div class="search-bar">
+                    <div class="search-group">
+                        <form action="/admin" method="get" style="display: flex; gap: 10px;">
+                            <input type="text" class="search-input" name="userKeyword" placeholder="搜索用户名/ID" th:value="${userKeyword}">
+                            <button type="submit" class="search-btn">搜索</button>
+                        </form>
+                    </div>
+                </div>
+                <div class="user-list">
+                    <div th:if="${#lists.isEmpty(users)}" class="empty-state">
+                        <i class="layui-icon layui-icon-user" style="font-size: 48px; display: block; margin-bottom: 15px;"></i>
+                        <p>暂无用户信息</p>
+                    </div>
+                    <div th:each="user : ${users}" class="user-card">
+                        <div class="user-info">
+                            <div class="user-avatar-lg" th:text="${#strings.substring(user.userName, 0, 1)}">用</div>
+                            <div class="user-details">
+                                <div class="user-username" th:text="${user.userName}">用户名</div>
+                                <div class="user-meta">
+                                    <span>UID: <span th:text="${user.userId}"></span></span>
+                                    <span>普通用户</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="user-actions">
+                            <button class="action-btn edit-btn" th:attr="onclick=|editUser('${user.userId}', '${user.userName}')|">编辑用户</button>
+                            <button class="action-btn delete-btn" th:attr="onclick=|deleteUser('${user.userId}')|">删除用户</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="edit-user-modal" class="modal" style="display: none;">
+                <div class="modal-content-large">
+                    <div class="modal-header">
+                        <h3>编辑用户</h3>
+                        <span class="modal-close" onclick="closeEditModal()">×</span>
+                    </div>
+                    <div class="modal-body">
+                        <input type="hidden" id="edit-user-id">
+                        <div class="form-row">
+                            <label>用户名</label>
+                            <input type="text" id="edit-username" class="form-input" placeholder="请输入用户名">
+                        </div>
+                        <div class="form-row">
+                            <label>真实姓名</label>
+                            <input type="text" id="edit-real-name" class="form-input" placeholder="请输入真实姓名">
+                        </div>
+                        <div class="form-row">
+                            <label>联系电话</label>
+                            <input type="text" id="edit-phone" class="form-input" placeholder="请输入联系电话">
+                        </div>
+                        <div class="form-row">
+                            <label>身份证号</label>
+                            <input type="text" id="edit-id-number" class="form-input" placeholder="请输入身份证号">
+                        </div>
+                        <div class="form-row">
+                            <label>性别</label>
+                            <select id="edit-gender" class="form-select">
+                                <option value="">未填写</option>
+                                <option value="男">男</option>
+                                <option value="女">女</option>
+                            </select>
+                        </div>
+                        <div class="form-row">
+                            <label>生日</label>
+                            <input type="text" id="edit-birthday" class="form-input" placeholder="如 1997-08-09">
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button class="btn-cancel" onclick="closeEditModal()">取消</button>
+                        <button class="btn-save" onclick="saveUser()">保存</button>
+                    </div>
+                </div>
+            </div>
+            <div id="landscape-audit" class="content-view">
+                <div class="search-bar">
+                    <h3 class="page-title">审核景点信息</h3>
+                    <div class="filter-group">
+                        <span>审核状态</span>
+                        <select class="filter-select" id="landscape-audit-state" onchange="searchLandscapes()">
+                            <option value="">全部</option>
+                            <option value="待审核">待审核</option>
+                            <option value="审核通过">审核通过</option>
+                            <option value="审核未通过">审核未通过</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="landscape-list" id="landscape-list">
+                    <div th:if="${#lists.isEmpty(landscapes)}" class="empty-state">
+                        <i class="layui-icon layui-icon-empty"></i>
+                        <p>暂无景点信息</p>
+                    </div>
+                    <div th:each="landscape : ${landscapes}" class="landscape-card" th:id="'landscape-card-' + ${landscape.landscapeId}">
+                        <div class="landscape-header">
+                            <div>
+                                <span class="landscape-title" th:text="${landscape.title}"></span>
+                                <span th:if="${landscape.auditState == '待审核'}" class="audit-tag pending">待审核</span>
+                                <span th:if="${landscape.auditState == '审核通过'}" class="audit-tag approved">审核通过</span>
+                                <span th:if="${landscape.auditState == '审核未通过'}" class="audit-tag rejected">审核未通过</span>
+                            </div>
+                        </div>
+                        <div class="landscape-meta">
+                            <span>地址：<span th:text="${landscape.address}"></span></span>
+                            <span>提交时间：<span th:text="${#temporals.format(landscape.publishTime, 'yyyy-MM-dd HH:mm')}"></span></span>
+                            <span th:if="${landscape.level != null}">等级：<span th:text="${landscape.level}"></span></span>
+                        </div>
+                        <div class="landscape-content" th:text="${landscape.content}"></div>
+                        <div class="landscape-actions">
+                            <button class="action-btn view-btn" th:attr="onclick=|viewLandscapeDetail('${landscape.landscapeId}')|">查看详情</button>
+                            <button th:if="${landscape.auditState == '待审核'}" class="action-btn pass-btn" th:attr="onclick=|auditLandscape('${landscape.landscapeId}', 'pass')|">通过</button>
+                            <button th:if="${landscape.auditState == '待审核'}" class="action-btn reject-btn" th:attr="onclick=|auditLandscape('${landscape.landscapeId}', 'reject')|">拒绝</button>
+                            <button class="action-btn delete-btn" th:attr="onclick=|deleteLandscape('${landscape.landscapeId}')|">删除</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="post-audit" class="content-view">
+                <div class="search-bar">
+                    <h3 class="page-title">审核推荐帖</h3>
+                    <div class="filter-group">
+                        <span>审核状态</span>
+                        <select class="filter-select" id="post-audit-state" onchange="searchPosts()">
+                            <option value="全部">全部</option>
+                            <option value="待审核">待审核</option>
+                            <option value="审核通过">审核通过</option>
+                            <option value="审核未通过">审核未通过</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="post-list">
+                    <div th:if="${#lists.isEmpty(posts)}" class="empty-state">
+                        <i class="layui-icon layui-icon-edit" style="font-size: 48px; display: block; margin-bottom: 15px;"></i>
+                        <p>暂无推荐帖信息</p>
+                    </div>
+                    <div th:each="post : ${posts}" class="landscape-card" th:id="'post-card-' + ${post.recomId}">
+                        <div class="landscape-header">
+                            <div>
+                                <span class="landscape-title" th:text="${post.title}"></span>
+                                <span th:if="${post.auditState == null || post.auditState == '' || post.auditState == '待审核'}" class="audit-tag pending">待审核</span>
+                                <span th:if="${post.auditState == '审核通过'}" class="audit-tag approved">审核通过</span>
+                                <span th:if="${post.auditState == '审核未通过'}" class="audit-tag rejected">审核未通过</span>
+                            </div>
+                        </div>
+                        <div class="landscape-meta">
+                            <span>发表用户：<span th:text="${post.userId}"></span></span>
+                            <span>发表时间：<span th:text="${#temporals.format(post.publishTime, 'yyyy-MM-dd HH:mm')}"></span></span>
+                        </div>
+                        <div class="landscape-content" th:text="${post.content}"></div>
+                        <div class="landscape-actions">
+                            <button class="action-btn view-btn" th:attr="onclick=|viewPostDetail('${post.recomId}')|">查看详情</button>
+                            <button th:if="${post.auditState == null || post.auditState == '' || post.auditState == '待审核'}" class="action-btn pass-btn" th:attr="onclick=|auditPost('${post.recomId}', 'pass')|">通过</button>
+                            <button th:if="${post.auditState == null || post.auditState == '' || post.auditState == '待审核'}" class="action-btn reject-btn" th:attr="onclick=|auditPost('${post.recomId}', 'reject')|">拒绝</button>
+                            <button class="action-btn delete-btn" th:attr="onclick=|deletePost('${post.recomId}')|">删除</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.staticfile.org/layui/2.9.10/layui.js"></script>
+    <script>
+        function switchView(viewId) {
+            document.querySelectorAll('.sidebar-item').forEach(item => item.classList.remove('active'));
+            document.querySelectorAll('.content-view').forEach(view => view.classList.remove('active'));
+            
+            event.currentTarget.classList.add('active');
+            document.getElementById(viewId).classList.add('active');
+        }
+
+        function deleteUser(id) {
+            layer.confirm('确定删除该用户？', {
+                btn: ['确定', '取消']
+            }, function(index) {
+                layer.close(index);
+                var xhr = new XMLHttpRequest();
+                xhr.open('POST', '/admin/users/delete');
+                xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+                xhr.onload = function() {
+                    if (xhr.responseText === 'success') {
+                        layer.msg('删除成功', {icon: 1});
+                        setTimeout(function() {
+                            location.reload();
+                        }, 1500);
+                    } else {
+                        layer.msg('删除失败', {icon: 2});
+                    }
+                };
+                xhr.send('id=' + id);
+            });
+        }
+
+        function editUser(id, userName) {
+            document.getElementById('edit-user-id').value = id;
+            document.getElementById('edit-username').value = userName;
+            
+            document.getElementById('edit-real-name').value = '';
+            document.getElementById('edit-phone').value = '';
+            document.getElementById('edit-id-number').value = '';
+            document.getElementById('edit-gender').value = '';
+            document.getElementById('edit-birthday').value = '';
+            
+            var xhr = new XMLHttpRequest();
+            xhr.open('GET', '/admin/users/detail?id=' + encodeURIComponent(id));
+            xhr.onload = function() {
+                if (xhr.status === 200) {
+                    var data = JSON.parse(xhr.responseText);
+                    if (data.realName) document.getElementById('edit-real-name').value = data.realName;
+                    if (data.phoneNumber) document.getElementById('edit-phone').value = data.phoneNumber;
+                    if (data.idNumber) document.getElementById('edit-id-number').value = data.idNumber;
+                    if (data.gender) document.getElementById('edit-gender').value = data.gender;
+                    if (data.birthday) document.getElementById('edit-birthday').value = data.birthday;
+                }
+            };
+            xhr.send();
+            
+            document.getElementById('edit-user-modal').style.display = 'flex';
+        }
+
+        function closeEditModal() {
+            document.getElementById('edit-user-modal').style.display = 'none';
+        }
+
+        function saveUser() {
+            var id = document.getElementById('edit-user-id').value;
+            var userName = document.getElementById('edit-username').value;
+            var realName = document.getElementById('edit-real-name').value;
+            var phone = document.getElementById('edit-phone').value;
+            var idNumber = document.getElementById('edit-id-number').value;
+            var gender = document.getElementById('edit-gender').value;
+            var birthday = document.getElementById('edit-birthday').value;
+            
+            if (!userName || userName.trim() === '') {
+                layer.msg('用户名不能为空', {icon: 2});
+                return;
+            }
+            
+            var xhr = new XMLHttpRequest();
+            xhr.open('POST', '/admin/users/update');
+            xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+            xhr.onload = function() {
+                if (xhr.responseText === 'success') {
+                    layer.msg('修改成功', {icon: 1});
+                    closeEditModal();
+                    setTimeout(function() {
+                        location.reload();
+                    }, 1500);
+                } else {
+                    layer.msg('修改失败', {icon: 2});
+                }
+            };
+            xhr.send('id=' + encodeURIComponent(id) + 
+                     '&userName=' + encodeURIComponent(userName) +
+                     '&realName=' + encodeURIComponent(realName) +
+                     '&phoneNumber=' + encodeURIComponent(phone) +
+                     '&idNumber=' + encodeURIComponent(idNumber) +
+                     '&gender=' + encodeURIComponent(gender) +
+                     '&birthday=' + encodeURIComponent(birthday));
+        }
+
+        function searchLandscapes() {
+            var auditState = document.getElementById('landscape-audit-state').value;
+            var xhr = new XMLHttpRequest();
+            var url = '/admin/landscapes/search?';
+            if (auditState) {
+                url += 'auditState=' + encodeURIComponent(auditState);
+            }
+            xhr.open('GET', url);
+            xhr.onload = function() {
+                if (xhr.status === 200) {
+                    document.getElementById('landscape-list').innerHTML = xhr.responseText;
+                }
+            };
+            xhr.send();
+        }
+
+        function auditLandscape(id, action) {
+            var msg = action === 'pass' ? '确定通过该景点审核？' : '确定拒绝该景点审核？';
+            layer.confirm(msg, {
+                btn: ['确定', '取消']
+            }, function(index) {
+                layer.close(index);
+                var xhr = new XMLHttpRequest();
+                xhr.open('POST', '/admin/landscapes/audit');
+                xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+                xhr.onload = function() {
+                    if (xhr.responseText === 'success') {
+                        layer.msg('操作成功', {icon: 1});
+                        setTimeout(function() {
+                            searchLandscapes();
+                        }, 1500);
+                    } else {
+                        layer.msg('操作失败', {icon: 2});
+                    }
+                };
+                xhr.send('id=' + id + '&action=' + action);
+            });
+        }
+
+        function auditPost(id, action) {
+            var msg = action === 'pass' ? '确定通过该推荐帖审核？' : '确定拒绝该推荐帖审核？';
+            layer.confirm(msg, {
+                btn: ['确定', '取消']
+            }, function(index) {
+                layer.close(index);
+                var xhr = new XMLHttpRequest();
+                xhr.open('POST', '/admin/posts/audit');
+                xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+                xhr.onload = function() {
+                    if (xhr.responseText === 'success') {
+                        layer.msg('操作成功', {icon: 1});
+                        setTimeout(function() {
+                            searchPosts();
+                        }, 1500);
+                    } else {
+                        layer.msg('操作失败', {icon: 2});
+                    }
+                };
+                xhr.send('id=' + id + '&action=' + action);
+            });
+        }
+
+        function viewLandscapeDetail(id) {
+            window.location.href = '/admin/landscapes/detail/' + id;
+        }
+
+        function viewPostDetail(id) {
+            window.location.href = '/admin/posts/detail/' + id;
+        }
+
+        function deleteLandscape(id) {
+            layer.confirm('确定删除该景点？', {
+                btn: ['确定', '取消']
+            }, function(index) {
+                layer.close(index);
+                var xhr = new XMLHttpRequest();
+                xhr.open('POST', '/admin/landscapes/delete');
+                xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+                xhr.onload = function() {
+                    if (xhr.responseText === 'success') {
+                        layer.msg('删除成功', {icon: 1});
+                        var card = document.getElementById('landscape-card-' + id);
+                        if (card) {
+                            card.remove();
+                        }
+                    } else {
+                        layer.msg('删除失败', {icon: 2});
+                    }
+                };
+                xhr.send('id=' + id);
+            });
+        }
+
+        function deletePost(id) {
+            layer.confirm('确定删除该推荐帖？', {
+                btn: ['确定', '取消']
+            }, function(index) {
+                layer.close(index);
+                var xhr = new XMLHttpRequest();
+                xhr.open('POST', '/admin/posts/delete');
+                xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+                xhr.onload = function() {
+                    if (xhr.responseText === 'success') {
+                        layer.msg('删除成功', {icon: 1});
+                        var card = document.getElementById('post-card-' + id);
+                        if (card) {
+                            card.remove();
+                        }
+                    } else {
+                        layer.msg('删除失败', {icon: 2});
+                    }
+                };
+                xhr.send('id=' + id);
+            });
+        }
+
+        function searchPosts() {
+            var auditState = document.getElementById('post-audit-state').value;
+            var url = '/admin/posts/search?';
+            if (auditState && auditState !== '全部') {
+                url += 'auditState=' + encodeURIComponent(auditState);
+            }
+            var xhr = new XMLHttpRequest();
+            xhr.open('GET', url);
+            xhr.onload = function() {
+                if (xhr.status === 200) {
+                    document.querySelector('#post-audit .post-list').innerHTML = xhr.responseText;
+                }
+            };
+            xhr.send();
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,27 @@
+body { margin: 0; font-family: "Microsoft YaHei", "Segoe UI", sans-serif; background: #fafbfc; }
+.top-nav { background: #fff; box-shadow: 0 2px 8px rgba(0,0,0,.08); position: sticky; top: 0; z-index: 999; }
+.nav-container { width: 1200px; margin: 0 auto; display: flex; justify-content: space-between; align-items: center; height: 60px; }
+.logo-text { font-size: 18px; font-weight: 700; color: #1a56db; }
+.nav-menu { display: flex; gap: 28px; align-items: center; }
+.nav-menu a { text-decoration: none; color: #333; font-size: 14px; font-weight: 500; padding: 8px 0; border-bottom: 2px solid transparent; }
+.nav-menu a:hover, .nav-menu a.active { color: #1a56db; border-bottom-color: #1a56db; }
+.nav-user { display: flex; align-items: center; gap: 14px; }
+.nav-link-btn { padding: 6px 14px; border-radius: 4px; font-size: 12px; text-decoration: none; border: 1px solid #1a56db; background: #1a56db; color: #fff; }
+.nav-link-btn.outline { background: #fff; color: #1a56db; }
+.nav-link-btn.primary { background: #1a56db; color: #fff; border-color: #1a56db; }
+.nav-link-muted { font-size: 12px; color: #6c757d; text-decoration: none; }
+.user-chip { font-size: 12px; color: #1a56db; background: #f0f7ff; padding: 6px 10px; border-radius: 16px; max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.footer { background: #fff; border-top: 1px solid #f0f0f0; padding: 24px 0; margin-top: 40px; }
+.copyright { font-size: 12px; color: #6c757d; text-align: center; }
+.page-wrap { width: 1200px; margin: 24px auto 60px; }
+.alert { padding: 10px 14px; border-radius: 6px; margin-bottom: 16px; font-size: 14px; }
+.alert-info { background: #e8f4ff; color: #0b5; border: 1px solid #b8daff; }
+.alert-error { background: #fdecea; color: #c0392b; border: 1px solid #f5c6cb; }
+.btn { display: inline-block; padding: 8px 18px; border-radius: 4px; border: none; cursor: pointer; font-size: 14px; text-decoration: none; text-align: center; }
+.btn-primary { background: #1a56db; color: #fff; }
+.btn-outline { background: #fff; color: #1a56db; border: 1px solid #1a56db; }
+.btn-sm { padding: 6px 12px; font-size: 13px; }
+.card { background: #fff; border-radius: 8px; box-shadow: 0 2px 12px rgba(0,0,0,.05); padding: 20px; margin-bottom: 20px; }
+input.layui-input, textarea.layui-textarea, select.layui-select { border: 1px solid #ced4da; border-radius: 4px; padding: 8px 12px; font-size: 14px; width: 100%; box-sizing: border-box; }
+label { font-size: 14px; color: #555; display: block; margin-bottom: 6px; }
+.form-row { margin-bottom: 16px; }

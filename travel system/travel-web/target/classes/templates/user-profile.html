@@ -1,0 +1,699 @@
+<!DOCTYPE html>
+<html lang="zh-CN" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>旅游景点推荐系统 - 个人中心</title>
+    <link rel="stylesheet" href="/static/css/layui.css">
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: "微软雅黑", sans-serif;
+            background-color: #fafbfc;
+        }
+        .top-nav {
+            background-color: #fff;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 999;
+        }
+        .nav-container {
+            width: 1200px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            height: 60px;
+        }
+        .nav-logo {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .logo-text {
+            font-size: 18px;
+            font-weight: bold;
+            color: #1a56db;
+        }
+        .nav-menu {
+            display: flex;
+            gap: 30px;
+        }
+        .nav-menu a {
+            text-decoration: none;
+            color: #333;
+            font-size: 14px;
+            font-weight: 500;
+            padding: 8px 0;
+            border-bottom: 2px solid transparent;
+        }
+        .nav-menu a:hover, .nav-menu a.active {
+            color: #1a56db;
+            border-bottom: 2px solid #1a56db;
+        }
+        .nav-user {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+        .user-avatar {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            background-color: #f0f7ff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #1a56db;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        .nav-btn {
+            padding: 6px 14px;
+            border-radius: 4px;
+            font-size: 12px;
+            cursor: pointer;
+            border: none;
+        }
+        .login-btn {
+            background-color: #fff;
+            color: #1a56db;
+            border: 1px solid #1a56db;
+            display: none;
+        }
+        .publish-btn {
+            background-color: #1a56db;
+            color: #fff;
+        }
+
+        .center-container {
+            width: 1200px;
+            margin: 80px auto 30px;
+            display: flex;
+            gap: 20px;
+            min-height: calc(100vh - 170px);
+        }
+
+        .left-sidebar {
+            width: 220px;
+            background-color: #fff;
+            border-radius: 8px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.05);
+            padding: 20px 0;
+        }
+        .sidebar-title {
+            font-size: 16px;
+            font-weight: bold;
+            color: #333;
+            padding: 0 20px 12px;
+            border-bottom: 1px solid #f0f0f0;
+            margin-bottom: 15px;
+        }
+        .sidebar-menu {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+        .sidebar-item {
+            padding: 12px 20px;
+            color: #333;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 14px;
+        }
+        .sidebar-item:hover {
+            background-color: #f0f7ff;
+            color: #1a56db;
+        }
+        .sidebar-item.active {
+            background-color: #e6f0ff;
+            color: #1a56db;
+            border-left: 3px solid #1a56db;
+        }
+        .sidebar-icon {
+            font-size: 16px;
+            width: 20px;
+            text-align: center;
+        }
+
+        .main-content {
+            flex: 1;
+            background-color: #fff;
+            border-radius: 8px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.05);
+            padding: 24px;
+        }
+        .page-title {
+            font-size: 20px;
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 20px;
+            padding-left: 8px;
+            border-left: 4px solid #1a56db;
+        }
+        .info-card {
+            margin-bottom: 24px;
+        }
+        .card-header {
+            font-size: 16px;
+            font-weight: 500;
+            color: #333;
+            margin-bottom: 16px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid #f0f0f0;
+        }
+        .info-table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 0 12px;
+        }
+        .info-table td {
+            font-size: 14px;
+        }
+        .info-label {
+            width: 120px;
+            color: #6c757d;
+            text-align: left;
+            padding-right: 20px;
+        }
+        .info-value {
+            color: #333;
+            padding: 4px 0;
+        }
+        .account-btn-group {
+            margin-top: 20px;
+            display: flex;
+            gap: 16px;
+        }
+        .center-btn {
+            padding: 8px 16px;
+            border-radius: 4px;
+            font-size: 14px;
+            cursor: pointer;
+            border: none;
+            transition: all 0.2s;
+        }
+        .default-btn {
+            background-color: #fff;
+            border: 1px solid #ced4da;
+            color: #333;
+        }
+        .default-btn:hover {
+            background-color: #f8f9fa;
+        }
+        .danger-btn {
+            background-color: #dc3545;
+            color: #fff;
+        }
+        .danger-btn:hover {
+            background-color: #bb2d3b;
+        }
+
+        .right-sidebar {
+            width: 260px;
+            background-color: #fff;
+            border-radius: 8px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.05);
+            padding: 20px;
+        }
+        .user-card {
+            text-align: center;
+            padding-bottom: 16px;
+            border-bottom: 1px solid #f0f0f0;
+            margin-bottom: 20px;
+        }
+        .avatar-lg {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            background-color: #f0f0f0;
+            color: #1a56db;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 32px;
+            font-weight: bold;
+            margin: 0 auto 12px;
+        }
+        .user-name {
+            font-size: 18px;
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 4px;
+        }
+        .user-role {
+            font-size: 12px;
+            color: #6c757d;
+        }
+        .action-menu {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+        .action-item {
+            padding: 12px 16px;
+            margin-bottom: 8px;
+            border-radius: 4px;
+            color: #1a56db;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 14px;
+            background-color: #fafbfc;
+            border: 1px solid #f0f0f0;
+        }
+        .action-item:hover {
+            background-color: #e6f0ff;
+            border-color: #d1e0ff;
+        }
+        .action-icon {
+            font-size: 16px;
+            width: 20px;
+            text-align: center;
+        }
+
+        .footer {
+            background-color: #fff;
+            border-top: 1px solid #f0f0f0;
+            padding: 30px 0;
+            margin-top: 30px;
+        }
+        .footer-container {
+            width: 1200px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .footer-desc {
+            font-size: 12px;
+            color: #6c757d;
+            line-height: 1.5;
+        }
+        .footer-links {
+            display: flex;
+            gap: 20px;
+        }
+        .footer-links a {
+            text-decoration: none;
+            font-size: 12px;
+            color: #6c757d;
+        }
+        .footer-links a:hover {
+            color: #1a56db;
+        }
+        .copyright {
+            font-size: 12px;
+            color: #6c757d;
+            text-align: center;
+            margin-top: 20px;
+        }
+        .alert {
+            padding: 12px 16px;
+            margin-bottom: 16px;
+            border-radius: 4px;
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+    </style>
+</head>
+<body>
+    <div class="top-nav">
+        <div class="nav-container">
+            <div class="nav-logo">
+                <span class="logo-text">旅游景点推荐系统</span>
+            </div>
+            <div class="nav-menu">
+                <a href="/">首页</a>
+                <a href="/landscapes">景点信息</a>
+                <a href="/posts">推荐帖</a>
+                <a href="/my/collects">我的</a>
+                <a href="/user/profile" class="active">个人中心</a>
+            </div>
+            <div class="nav-user">
+                <button class="nav-btn login-btn" onclick="window.location.href='/login'">登录</button>
+                <button class="nav-btn publish-btn" onclick="window.location.href='/landscapes/new'">发布景点</button>
+                <button class="nav-btn publish-btn" onclick="window.location.href='/posts/new'">发布推荐帖</button>
+                <div class="user-avatar" th:text="${profile.userName != null ? profile.userName.charAt(0) : '用'}"></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="center-container">
+        <div class="left-sidebar">
+            <div class="sidebar-title">个人中心</div>
+            <ul class="sidebar-menu">
+                <li class="sidebar-item active">
+                    <span class="sidebar-icon"><i class="layui-icon layui-icon-user"></i></span>
+                    <span>个人资料</span>
+                </li>
+            </ul>
+        </div>
+
+        <div class="main-content">
+            <div th:if="${msg}" class="alert" th:text="${msg}"></div>
+            <h3 class="page-title">个人资料管理</h3>
+            
+            <div class="info-card">
+                <div class="card-header">基本信息</div>
+                <table class="info-table">
+                    <tr>
+                        <td class="info-label">用户名</td>
+                        <td class="info-value" th:text="${profile.userName ?: '-'}">-</td>
+                    </tr>
+                    <tr>
+                        <td class="info-label">真实姓名</td>
+                        <td class="info-value" th:text="${profile.realName ?: '-'}">-</td>
+                    </tr>
+                    <tr>
+                        <td class="info-label">用户ID</td>
+                        <td class="info-value" th:text="${profile.userId ?: '-'}">-</td>
+                    </tr>
+                    <tr>
+                        <td class="info-label">性别</td>
+                        <td class="info-value" th:text="${profile.gender ?: '-'}">-</td>
+                    </tr>
+                    <tr>
+                        <td class="info-label">出生日期</td>
+                        <td class="info-value" th:text="${profile.birthday ?: '-'}">-</td>
+                    </tr>
+                    <tr>
+                        <td class="info-label">联系电话</td>
+                        <td class="info-value" th:text="${profile.phoneNumber ?: '-'}">-</td>
+                    </tr>
+                    <tr>
+                        <td class="info-label">身份证号</td>
+                        <td class="info-value" th:text="${profile.idNumber ?: '-'}">-</td>
+                    </tr>
+                    <tr>
+                        <td class="info-label">注册时间</td>
+                        <td class="info-value" th:text="${profile.registerTime != null ? #temporals.format(profile.registerTime, 'yyyy年MM月dd日 HH:mm:ss') : '-'}">-</td>
+                    </tr>
+                </table>
+                
+                <div class="account-btn-group">
+                    <button class="center-btn default-btn" onclick="logout()">退出登录</button>
+                    <button class="center-btn danger-btn" onclick="cancelAccount()">注销账号</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="right-sidebar">
+            <div class="user-card">
+                <div class="avatar-lg" th:text="${profile.userName != null ? profile.userName.charAt(0) : '用'}"></div>
+                <div class="user-name" th:text="${profile.userName ?: '用户'}"></div>
+                <div class="user-role">普通用户</div>
+            </div>
+            
+            <ul class="action-menu">
+                <li class="action-item" onclick="jumpToEditPage()">
+                    <span class="action-icon"><i class="layui-icon layui-icon-edit"></i></span>
+                    <span>编辑个人资料</span>
+                </li>
+                <li class="action-item" onclick="jumpToChangePwdPage()">
+                    <span class="action-icon"><i class="layui-icon layui-icon-lock"></i></span>
+                    <span>修改密码</span>
+                </li>
+            </ul>
+        </div>
+    </div>
+
+    <div class="footer">
+        <div class="footer-container">
+            <div class="footer-desc">
+                旅游景点推荐系统，让你的旅行更加轻松愉快，发现更多美好的景点。
+            </div>
+            <div class="footer-links">
+                <a href="#">关于我们</a>
+                <a href="#">服务条款</a>
+                <a href="#">隐私政策</a>
+                <a href="#">联系我们</a>
+            </div>
+        </div>
+        <div class="copyright">
+            ©2025 旅游景点推荐系统 版权所有 | 南京航空航天大学计算中心支持
+        </div>
+    </div>
+
+    <script src="/static/js/layui.js"></script>
+    <script>
+        layui.use(['element', 'jquery'], function(){
+            const element = layui.element;
+            const $ = layui.jquery;
+            $('.login-btn').hide();
+            $('.user-avatar').show();
+        });
+
+        function jumpToEditPage() {
+            window.location.href = '/user/profile/edit';
+        }
+
+        function jumpToChangePwdPage() {
+            window.location.href = '/user/password';
+        }
+
+        function logout() {
+            if (confirm('确定要退出登录吗？')) {
+                window.location.href = '/login';
+            }
+        }
+
+        function cancelAccount() {
+            if (!confirm('警告：账号注销后所有数据将永久删除，不可恢复！确定要继续吗？')) {
+                return;
+            }
+            
+            const modal = document.createElement('div');
+            modal.style.cssText = `
+                position: fixed;
+                top: 0;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                background: rgba(0,0,0,0.5);
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                z-index: 9999;
+            `;
+            
+            const content = document.createElement('div');
+            content.style.cssText = `
+                background: white;
+                border-radius: 8px;
+                padding: 20px 24px;
+                width: 440px;
+                max-width: 90%;
+            `;
+            
+            content.innerHTML = `
+                <h3 style="margin:0 0 8px;font-size:16px;font-weight:bold;color:#333">验证身份</h3>
+                <p style="color:#666;font-size:13px;margin-bottom:16px">请选择验证方式确认身份</p>
+                
+                <div style="display:flex;gap:8px;margin-bottom:20px">
+                    <button id="pwdBtn" style="flex:1;padding:9px 12px;border:1px solid #ddd;background:white;color:#333;border-radius:4px;cursor:pointer;font-size:14px">密码验证</button>
+                    <button id="smsBtn" style="flex:1;padding:9px 12px;border:none;background:#0d6efd;color:white;border-radius:4px;cursor:pointer;font-size:14px">短信验证</button>
+                </div>
+                
+                <div id="pwdForm" style="display:none">
+                    <div style="margin-bottom:16px">
+                        <label style="display:block;margin-bottom:4px;font-size:13px;color:#666">当前密码</label>
+                        <input type="password" id="currentPwd" style="width:100%;padding:10px;border:1px solid #ddd;border-radius:4px;box-sizing:border-box;font-size:14px" placeholder="请输入当前密码"/>
+                    </div>
+                </div>
+                
+                <div id="smsForm" style="display:block">
+                    <div style="margin-bottom:16px">
+                        <label style="display:block;margin-bottom:4px;font-size:13px;color:#666">手机号</label>
+                        <input type="text" id="smsPhone" style="width:100%;padding:10px;border:1px solid #ddd;border-radius:4px;box-sizing:border-box;font-size:14px" placeholder="请输入手机号" readonly/>
+                    </div>
+                    <div style="margin-bottom:16px">
+                        <label style="display:block;margin-bottom:4px;font-size:13px;color:#666">验证码</label>
+                        <div style="display:flex;gap:10px">
+                            <input type="text" id="smsCode" style="flex:1;padding:10px;border:1px solid #ddd;border-radius:4px;box-sizing:border-box;font-size:14px" placeholder="请输入验证码"/>
+                            <button id="sendCodeBtn" style="padding:10px 20px;border:1px solid #ddd;background:white;color:#333;border-radius:4px;cursor:pointer;font-size:14px">发送验证码</button>
+                        </div>
+                    </div>
+                </div>
+                
+                <div style="color:red;font-size:12px;margin-bottom:16px;min-height:16px" id="errorMsg"></div>
+                
+                <div style="display:flex;gap:12px">
+                    <button id="cancelBtn" style="flex:1;padding:10px;border:1px solid #ddd;background:white;color:#666;border-radius:4px;cursor:pointer;font-size:14px">取消</button>
+                    <button id="submitBtn" style="flex:1;padding:10px;border:none;background:#dc3545;color:white;border-radius:4px;cursor:pointer;font-size:14px">提交注销</button>
+                </div>
+            `;
+            
+            modal.appendChild(content);
+            document.body.appendChild(modal);
+            
+            const pwdBtn = content.querySelector('#pwdBtn');
+            const smsBtn = content.querySelector('#smsBtn');
+            const pwdForm = content.querySelector('#pwdForm');
+            const smsForm = content.querySelector('#smsForm');
+            const sendCodeBtn = content.querySelector('#sendCodeBtn');
+            const cancelBtn = content.querySelector('#cancelBtn');
+            const submitBtn = content.querySelector('#submitBtn');
+            const errorMsg = content.querySelector('#errorMsg');
+            const smsPhone = content.querySelector('#smsPhone');
+            
+            let verifyType = 'sms';
+            
+            pwdBtn.addEventListener('click', function() {
+                verifyType = 'password';
+                pwdBtn.style.borderColor = '#0d6efd';
+                pwdBtn.style.background = '#0d6efd';
+                pwdBtn.style.color = 'white';
+                smsBtn.style.borderColor = '#ddd';
+                smsBtn.style.background = 'white';
+                smsBtn.style.color = '#333';
+                pwdForm.style.display = 'block';
+                smsForm.style.display = 'none';
+            });
+            
+            smsBtn.addEventListener('click', function() {
+                verifyType = 'sms';
+                smsBtn.style.borderColor = '#0d6efd';
+                smsBtn.style.background = '#0d6efd';
+                smsBtn.style.color = 'white';
+                pwdBtn.style.borderColor = '#ddd';
+                pwdBtn.style.background = 'white';
+                pwdBtn.style.color = '#333';
+                pwdForm.style.display = 'none';
+                smsForm.style.display = 'block';
+                
+                fetch('/user/get-phone', { method: 'GET' })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        smsPhone.value = data.phone;
+                    }
+                });
+            });
+            
+            fetch('/user/get-phone', { method: 'GET' })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    smsPhone.value = data.phone;
+                }
+            });
+            
+            sendCodeBtn.addEventListener('click', function() {
+                const phone = smsPhone.value;
+                if (!phone) {
+                    errorMsg.textContent = '无法获取手机号';
+                    return;
+                }
+                
+                sendCodeBtn.disabled = true;
+                sendCodeBtn.textContent = '发送中...';
+                
+                fetch('/user/send-delete-code', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: 'phone=' + encodeURIComponent(phone)
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        alert('验证码: ' + data.code);
+                        let count = 60;
+                        sendCodeBtn.textContent = count + '秒后重发';
+                        const timer = setInterval(() => {
+                            count--;
+                            if (count <= 0) {
+                                clearInterval(timer);
+                                sendCodeBtn.textContent = '发送验证码';
+                                sendCodeBtn.disabled = false;
+                            } else {
+                                sendCodeBtn.textContent = count + '秒后重发';
+                            }
+                        }, 1000);
+                    } else {
+                        errorMsg.textContent = data.message;
+                        sendCodeBtn.textContent = '发送验证码';
+                        sendCodeBtn.disabled = false;
+                    }
+                })
+                .catch(() => {
+                    errorMsg.textContent = '发送失败';
+                    sendCodeBtn.textContent = '发送验证码';
+                    sendCodeBtn.disabled = false;
+                });
+            });
+            
+            cancelBtn.addEventListener('click', function() {
+                document.body.removeChild(modal);
+            });
+            
+            submitBtn.addEventListener('click', function() {
+                errorMsg.textContent = '';
+                
+                if (verifyType === 'password') {
+                    const pwd = content.querySelector('#currentPwd').value;
+                    if (!pwd) {
+                        errorMsg.textContent = '请输入当前密码';
+                        return;
+                    }
+                    
+                    fetch('/user/delete', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                        body: 'type=password&value=' + encodeURIComponent(pwd)
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            alert('账号已成功注销');
+                            window.location.href = '/login';
+                        } else {
+                            errorMsg.textContent = data.message;
+                        }
+                    });
+                } else {
+                    const code = content.querySelector('#smsCode').value;
+                    if (!code) {
+                        errorMsg.textContent = '请输入验证码';
+                        return;
+                    }
+                    
+                    fetch('/user/delete', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                        body: 'type=sms&value=' + encodeURIComponent(code)
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            alert('账号已成功注销');
+                            window.location.href = '/login';
+                        } else {
+                            errorMsg.textContent = data.message;
+                        }
+                    });
+                }
+            });
+        }
+
+        document.querySelectorAll('.sidebar-item').forEach(item => {
+            item.addEventListener('click', function() {
+                document.querySelectorAll('.sidebar-item').forEach(sidebar => {
+                    sidebar.classList.remove('active');
+                });
+                this.classList.add('active');
+            });
+        });
+    </script>
+</body>
+</html>

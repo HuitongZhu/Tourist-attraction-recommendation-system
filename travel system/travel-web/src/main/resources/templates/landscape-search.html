@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="zh-CN" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8"/>
+    <title>景点信息</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/layui@2.8.18/dist/css/layui.css"/>
+    <link rel="stylesheet" th:href="@{/css/app.css}"/>
+    <style>
+        .search-bar { background: #fff; padding: 20px; border-radius: 8px; margin-bottom: 18px; display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; }
+        .sort-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; font-size: 14px; color: #6c757d; }
+        .sort-bar a { margin-left: 12px; text-decoration: none; color: #333; }
+        .sort-bar a.active { color: #1a56db; font-weight: 600; }
+        .grid { display: flex; flex-wrap: wrap; gap: 24px; }
+        .landscape-card { width: calc((100% - 72px) / 4); background: #fff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 12px rgba(0,0,0,.05); }
+        .card-img { height: 170px; }
+        .card-img img { width: 100%; height: 100%; object-fit: cover; }
+        .card-content { padding: 14px; }
+        .card-title { font-size: 15px; font-weight: 600; margin-bottom: 8px; }
+        .card-title a { color: #333; text-decoration: none; }
+        .card-title a:hover { color: #1a56db; }
+        .muted { font-size: 12px; color: #6c757d; }
+    </style>
+</head>
+<body>
+<div th:replace="~{fragments :: navbar(${navKey})}"></div>
+<div class="page-wrap" style="margin-top:20px">
+    <div th:if="${msg}" class="alert alert-info" th:text="${msg}"></div>
+    <h2 style="font-size:20px;border-left:4px solid #1a56db;padding-left:10px">景点信息</h2>
+    <form class="search-bar" th:action="@{/landscapes}" method="get">
+        <div style="flex:1;min-width:200px">
+            <label>关键词</label>
+            <input class="layui-input" name="keyword" th:value="${keyword}" placeholder="景点名称、地址等"/>
+        </div>
+        <div style="width:160px">
+            <label>城市（地址包含）</label>
+            <select class="layui-select" name="city" style="height:38px;width:100%">
+                <option value="all" th:selected="${city == 'all'}">全部</option>
+                <option value="南京" th:selected="${city == '南京'}">南京</option>
+                <option value="苏州" th:selected="${city == '苏州'}">苏州</option>
+                <option value="杭州" th:selected="${city == '杭州'}">杭州</option>
+                <option value="黄山" th:selected="${city == '黄山'}">黄山</option>
+            </select>
+        </div>
+        <div style="width:160px">
+            <label>等级</label>
+            <select class="layui-select" name="level" style="height:38px;width:100%">
+                <option value="all" th:selected="${level == 'all'}">全部</option>
+                <option value="AAAAA" th:selected="${level == 'AAAAA'}">AAAAA</option>
+                <option value="AAAA" th:selected="${level == 'AAAA'}">AAAA</option>
+                <option value="AAA" th:selected="${level == 'AAA'}">AAA</option>
+            </select>
+        </div>
+        <input type="hidden" name="sort" th:value="${sort}"/>
+        <button type="submit" class="btn btn-primary">搜索</button>
+        <a class="btn btn-outline" th:href="@{/landscapes}">重置</a>
+    </form>
+    <div class="sort-bar">
+        <span>共 <strong th:text="${total}">0</strong> 条</span>
+    </div>
+    <div class="grid">
+        <div class="landscape-card" th:each="l : ${landscapes}">
+            <div class="card-img">
+                <img th:if="${l.imagePath != null}" th:src="${l.imagePath}" th:alt="${l.title}"/>
+                <img th:unless="${l.imagePath != null}" th:src="@{'https://picsum.photos/seed/' + ${l.landscapeId} + '/400/240'}" th:alt="${l.title}"/>
+            </div>
+            <div class="card-content">
+                <div class="card-title">
+                    <a th:href="@{/landscapes/{id}(id=${l.landscapeId})}" th:text="${l.title}">标题</a>
+                </div>
+                <div class="muted" th:text="${l.address}">地址</div>
+                <div class="muted" th:text="'点赞 ' + ${likeMap.getOrDefault(l.landscapeId, 0)} + ' · ' + ${l.level}">统计</div>
+            </div>
+        </div>
+    </div>
+    <p th:if="${#lists.isEmpty(landscapes)}" class="muted" style="text-align:center;padding:40px">暂无符合条件的景点</p>
+</div>
+<div th:replace="~{fragments :: footer}"></div>
+</body>
+</html>
