@@ -10,8 +10,9 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -23,6 +24,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
 import androidx.lifecycle.lifecycleScope
 import com.example.travel.ui.theme.TravelTheme
 import kotlinx.coroutines.launch
@@ -36,17 +38,14 @@ class AdminActivity : ComponentActivity() {
                 var currentModule by remember { mutableStateOf("USER_MGMT") }
 
                 Column(modifier = Modifier.fillMaxSize().background(Color.White)) {
-                    // 1. 顶部导航栏
                     AdminTopNavBar(onProfileClick = { currentModule = "PROFILE" })
 
                     Row(modifier = Modifier.fillMaxSize()) {
-                        // 2. 左侧导航侧边栏
                         AdminSidebar(
                             selectedModule = currentModule,
                             onModuleSelect = { currentModule = it }
                         )
 
-                        // 3. 右侧主内容区
                         Box(modifier = Modifier.weight(1f).padding(top = 16.dp, end = 16.dp, bottom = 16.dp)) {
                             when (currentModule) {
                                 "USER_MGMT" -> UserManagementScreen()
@@ -76,7 +75,6 @@ fun UserManagementScreen() {
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // 搜索框
         OutlinedTextField(
             value = searchText,
             onValueChange = { searchText = it },
@@ -92,7 +90,6 @@ fun UserManagementScreen() {
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        // 用户列表
         UserDataTable(searchText, refreshTrigger) { refreshTrigger++ }
     }
 }
@@ -101,15 +98,14 @@ fun UserManagementScreen() {
 fun UserDataTable(filter: String, refreshTrigger: Int, onRefresh: () -> Unit) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    var selectedUser by remember { mutableStateOf<UserResponse?>(null) }
+    var editingUserId by remember { mutableStateOf<String?>(null) }
     var users by remember { mutableStateOf<List<UserResponse>>(emptyList()) }
     var isLoading by remember { mutableStateOf(false) }
 
-    // 从后端加载用户
     LaunchedEffect(filter, refreshTrigger) {
         isLoading = true
         try {
-            val response = NetworkClient.apiService.getAllUsers(keyword = if(filter.isEmpty()) null else filter)
+            val response = NetworkClient.apiService.getAllUsers(keyword = if (filter.isEmpty()) null else filter)
             if (response.success) {
                 users = response.data?.content ?: emptyList()
             } else {
@@ -127,15 +123,15 @@ fun UserDataTable(filter: String, refreshTrigger: Int, onRefresh: () -> Unit) {
             CircularProgressIndicator()
         }
     } else {
-        LazyColumn(verticalArrangement = Arrangement.spacedBy(20.dp)) {
-            items(users) { user ->
+        LazyColumn(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            items(users, key = { it.userId ?: "" }) { user ->
                 UserListItem(
                     user = user,
-                    onEdit = { selectedUser = user },
+                    onEdit = { editingUserId = user.userId },
                     onDelete = {
                         scope.launch {
                             try {
-                                val res = NetworkClient.apiService.deleteUser(user.id)
+                                val res = NetworkClient.apiService.deleteUser(user.userId ?: "")
                                 if (res.success) {
                                     Toast.makeText(context, "删除成功", Toast.LENGTH_SHORT).show()
                                     onRefresh()
@@ -150,24 +146,13 @@ fun UserDataTable(filter: String, refreshTrigger: Int, onRefresh: () -> Unit) {
         }
     }
 
-    // 修改信息弹窗
-    selectedUser?.let { user ->
+    editingUserId?.let { userId ->
         EditUserDialog(
-            user = user,
-            onDismiss = { selectedUser = null },
-            onSave = { updatedStatus ->
-                scope.launch {
-                    try {
-                        val res = NetworkClient.apiService.updateUserStatus(user.id, updatedStatus)
-                        if (res.success) {
-                            Toast.makeText(context, "状态已更新", Toast.LENGTH_SHORT).show()
-                            selectedUser = null
-                            onRefresh()
-                        }
-                    } catch (e: Exception) {
-                        Toast.makeText(context, "同步失败", Toast.LENGTH_SHORT).show()
-                    }
-                }
+            userId = userId,
+            onDismiss = { editingUserId = null },
+            onSaved = {
+                editingUserId = null
+                onRefresh()
             }
         )
     }
@@ -175,95 +160,76 @@ fun UserDataTable(filter: String, refreshTrigger: Int, onRefresh: () -> Unit) {
 
 @Composable
 fun UserListItem(user: UserResponse, onEdit: () -> Unit, onDelete: () -> Unit) {
-    val initial = if (user.username.isNotEmpty()) user.username.take(1) else "?"
+    val name = user.userName.orEmpty()
+    val isAdmin = user.userType == "1"
+    val roleLabel = if (isAdmin) "系统管理员" else "普通用户"
 
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = Color(0xFFF8F9FA)),
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(12.dp),
         border = BorderStroke(1.dp, Color(0xFFEEEEEE))
     ) {
-        Column(modifier = Modifier.padding(20.dp)) {
+        Column(modifier = Modifier.padding(16.dp)) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Box(
-                    modifier = Modifier
-                        .size(72.dp)
-                        .background(Color(0xFF4A90E2), CircleShape),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = initial,
-                        fontSize = 32.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.White
-                    )
-                }
-
-                Spacer(modifier = Modifier.width(20.dp))
-
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = user.username,
-                        fontSize = 26.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.Black
-                    )
-                    Text(
-                        text = "ID: ${user.id}",
-                        fontSize = 18.sp,
-                        color = Color.Gray
-                    )
-                    Text(
-                        text = if(user.role == "ADMIN") "系统管理员" else "普通用户",
-                        fontSize = 18.sp,
-                        color = if(user.role == "ADMIN") Color.Red else Color(0xFF4A90E2),
-                        fontWeight = FontWeight.Medium
-                    )
-                    Text(
-                        text = "状态: ${user.status}",
-                        fontSize = 16.sp,
-                        color = if(user.status == "正常") Color(0xFF2E7D32) else Color.Red
-                    )
-                }
-
+                Text(
+                    text = name.ifBlank { "未命名用户" },
+                    fontSize = 22.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.Black
+                )
                 IconButton(onClick = onEdit) {
                     Icon(
                         imageVector = Icons.Default.Edit,
-                        contentDescription = "Edit",
+                        contentDescription = "修改信息",
                         tint = Color.Gray,
-                        modifier = Modifier.size(32.dp)
+                        modifier = Modifier.size(28.dp)
                     )
                 }
             }
 
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                UserInfoLine("用户 ID", user.userId)
+                UserInfoLine("用户类型", roleLabel, valueColor = if (isAdmin) Color.Red else Color(0xFF4A90E2))
+                user.phoneNumber?.takeIf { it.isNotBlank() }?.let {
+                    UserInfoLine("联系电话", it)
+                }
+                user.realName?.takeIf { it.isNotBlank() }?.let {
+                    UserInfoLine("真实姓名", it)
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(16.dp)
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 OutlinedButton(
                     onClick = onEdit,
-                    modifier = Modifier.weight(1f).height(54.dp),
-                    shape = RoundedCornerShape(27.dp),
-                    border = BorderStroke(1.dp, Color.Gray)
+                    modifier = Modifier.weight(1f).height(48.dp),
+                    shape = RoundedCornerShape(24.dp),
+                    border = BorderStroke(1.dp, Color(0xFF1A56DB))
                 ) {
-                    Text("修改状态", color = Color.Gray, fontSize = 18.sp)
+                    Text("修改信息", color = Color(0xFF1A56DB), fontSize = 16.sp)
                 }
 
                 Button(
                     onClick = onDelete,
-                    modifier = Modifier.weight(1f).height(54.dp),
+                    modifier = Modifier.weight(1f).height(48.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = Color.Red),
-                    shape = RoundedCornerShape(27.dp)
+                    shape = RoundedCornerShape(24.dp)
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(24.dp))
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text("删除用户", color = Color.White, fontSize = 18.sp)
+                        Icon(Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(20.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("删除", color = Color.White, fontSize = 16.sp)
                     }
                 }
             }
@@ -272,30 +238,202 @@ fun UserListItem(user: UserResponse, onEdit: () -> Unit, onDelete: () -> Unit) {
 }
 
 @Composable
-fun EditUserDialog(user: UserResponse, onDismiss: () -> Unit, onSave: (String) -> Unit) {
-    var status by remember { mutableStateOf(user.status) }
+private fun UserInfoLine(label: String, value: String?, valueColor: Color = Color.DarkGray) {
+    if (value.isNullOrBlank()) return
+    Row(modifier = Modifier.fillMaxWidth()) {
+        Text(
+            text = "$label：",
+            fontSize = 15.sp,
+            color = Color.Gray,
+            modifier = Modifier.width(88.dp)
+        )
+        Text(
+            text = value,
+            fontSize = 15.sp,
+            color = valueColor,
+            modifier = Modifier.weight(1f)
+        )
+    }
+}
 
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("修改用户状态", fontWeight = FontWeight.Bold, fontSize = 24.sp) },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                Text("用户: ${user.username}", fontSize = 18.sp)
-                Column {
-                    Text("账号状态", fontSize = 18.sp, fontWeight = FontWeight.Bold)
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        RadioButton(selected = status == "正常", onClick = { status = "正常" })
-                        Text("正常", fontSize = 18.sp)
-                        Spacer(modifier = Modifier.width(16.dp))
-                        RadioButton(selected = status == "禁用", onClick = { status = "禁用" })
-                        Text("禁用", fontSize = 18.sp)
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun EditUserDialog(userId: String, onDismiss: () -> Unit, onSaved: () -> Unit) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+
+    var userName by remember { mutableStateOf("") }
+    var realName by remember { mutableStateOf("") }
+    var phoneNumber by remember { mutableStateOf("") }
+    var idNumber by remember { mutableStateOf("") }
+    var gender by remember { mutableStateOf("男") }
+    var birthday by remember { mutableStateOf("") }
+    var genderExpanded by remember { mutableStateOf(false) }
+    var loading by remember { mutableStateOf(true) }
+    var saving by remember { mutableStateOf(false) }
+
+    val genderOptions = listOf("男", "女")
+
+    LaunchedEffect(userId) {
+        loading = true
+        try {
+            val res = NetworkClient.apiService.getAdminUserDetail(userId)
+            if (res.success && res.data != null) {
+                val d = res.data
+                userName = d.userName.orEmpty()
+                realName = d.realName.orEmpty()
+                phoneNumber = d.phoneNumber.orEmpty()
+                idNumber = d.idNumber.orEmpty()
+                gender = d.gender?.takeIf { it.isNotBlank() } ?: "男"
+                birthday = d.birthday.orEmpty()
+            } else {
+                Toast.makeText(context, res.message ?: "加载用户信息失败", Toast.LENGTH_SHORT).show()
+                onDismiss()
+            }
+        } catch (e: Exception) {
+            Toast.makeText(context, "加载失败: ${e.message}", Toast.LENGTH_SHORT).show()
+            onDismiss()
+        } finally {
+            loading = false
+        }
+    }
+
+    Dialog(onDismissRequest = onDismiss) {
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(8.dp),
+            shape = RoundedCornerShape(12.dp)
+        ) {
+            Column(
+                modifier = Modifier
+                    .padding(20.dp)
+                    .verticalScroll(rememberScrollState())
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("编辑用户", fontSize = 20.sp, fontWeight = FontWeight.Bold)
+                    IconButton(onClick = onDismiss) {
+                        Icon(Icons.Default.Close, contentDescription = "关闭")
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                if (loading) {
+                    CircularProgressIndicator(modifier = Modifier.align(Alignment.CenterHorizontally))
+                } else {
+                    AdminEditField("用户名", userName) { userName = it }
+                    AdminEditField("真实姓名", realName) { realName = it }
+                    AdminEditField("联系电话", phoneNumber) { phoneNumber = it }
+                    AdminEditField("身份证号", idNumber) { idNumber = it }
+
+                    Text("性别", fontSize = 14.sp, color = Color.Gray)
+                    ExposedDropdownMenuBox(
+                        expanded = genderExpanded,
+                        onExpandedChange = { genderExpanded = it },
+                        modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp)
+                    ) {
+                        OutlinedTextField(
+                            value = gender,
+                            onValueChange = {},
+                            readOnly = true,
+                            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = genderExpanded) },
+                            modifier = Modifier.menuAnchor().fillMaxWidth(),
+                            shape = RoundedCornerShape(8.dp)
+                        )
+                        ExposedDropdownMenu(
+                            expanded = genderExpanded,
+                            onDismissRequest = { genderExpanded = false }
+                        ) {
+                            genderOptions.forEach { option ->
+                                DropdownMenuItem(
+                                    text = { Text(option) },
+                                    onClick = {
+                                        gender = option
+                                        genderExpanded = false
+                                    }
+                                )
+                            }
+                        }
+                    }
+
+                    AdminEditField("生日", birthday, placeholder = "如 1997-10-02") { birthday = it }
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.End
+                    ) {
+                        OutlinedButton(onClick = onDismiss, modifier = Modifier.padding(end = 8.dp)) {
+                            Text("取消")
+                        }
+                        Button(
+                            onClick = {
+                                if (userName.isBlank()) {
+                                    Toast.makeText(context, "用户名不能为空", Toast.LENGTH_SHORT).show()
+                                    return@Button
+                                }
+                                saving = true
+                                scope.launch {
+                                    try {
+                                        val req = AdminUpdateUserRequest(
+                                            userName = userName.trim(),
+                                            realName = realName.trim().ifBlank { null },
+                                            phoneNumber = phoneNumber.trim().ifBlank { null },
+                                            idNumber = idNumber.trim().ifBlank { null },
+                                            gender = gender,
+                                            birthday = birthday.trim().ifBlank { null }
+                                        )
+                                        val res = NetworkClient.apiService.updateAdminUserProfile(userId, req)
+                                        if (res.success) {
+                                            Toast.makeText(context, "保存成功", Toast.LENGTH_SHORT).show()
+                                            onSaved()
+                                        } else {
+                                            Toast.makeText(context, res.message ?: "保存失败", Toast.LENGTH_SHORT).show()
+                                        }
+                                    } catch (e: Exception) {
+                                        Toast.makeText(context, "保存失败: ${e.message}", Toast.LENGTH_SHORT).show()
+                                    } finally {
+                                        saving = false
+                                    }
+                                }
+                            },
+                            enabled = !saving,
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF7C4DFF))
+                        ) {
+                            Text(if (saving) "保存中…" else "保存")
+                        }
                     }
                 }
             }
-        },
-        confirmButton = { Button(onClick = { onSave(status) }) { Text("确认修改", fontSize = 18.sp) } },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("取消", fontSize = 18.sp) } }
-    )
+        }
+    }
+}
+
+@Composable
+private fun AdminEditField(
+    label: String,
+    value: String,
+    placeholder: String = "",
+    onValueChange: (String) -> Unit
+) {
+    Column(modifier = Modifier.padding(bottom = 12.dp)) {
+        Text(label, fontSize = 14.sp, color = Color.Gray)
+        Spacer(modifier = Modifier.height(4.dp))
+        OutlinedTextField(
+            value = value,
+            onValueChange = onValueChange,
+            placeholder = { if (placeholder.isNotEmpty()) Text(placeholder) },
+            modifier = Modifier.fillMaxWidth(),
+            singleLine = label != "身份证号",
+            shape = RoundedCornerShape(8.dp)
+        )
+    }
 }
 
 @Composable
@@ -312,10 +450,6 @@ fun AdminProfilePage(onBack: () -> Unit) {
             shape = RoundedCornerShape(20.dp)
         ) {
             Column(modifier = Modifier.padding(32.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                Box(modifier = Modifier.size(110.dp).background(Color(0xFF1E293B), CircleShape), contentAlignment = Alignment.Center) {
-                    Text("A", color = Color.White, fontSize = 54.sp, fontWeight = FontWeight.Bold)
-                }
-                Spacer(modifier = Modifier.height(24.dp))
                 Text("系统管理员", fontSize = 28.sp, fontWeight = FontWeight.Bold)
                 Text("Super Admin", color = Color.Gray, fontSize = 20.sp)
                 Divider(modifier = Modifier.padding(vertical = 32.dp), color = Color(0xFFF3F4F6))

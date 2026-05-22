@@ -2,6 +2,7 @@ package com.example.travel
 
 import android.content.Intent
 import android.os.Bundle
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -19,7 +20,9 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.lifecycleScope
 import com.example.travel.ui.theme.TravelTheme
+import kotlinx.coroutines.launch
 
 class ChangePasswordActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -34,9 +37,21 @@ class ChangePasswordActivity : ComponentActivity() {
                         onMobileVerifyClick = {
                             startActivity(Intent(this, MobileVerifyPasswordActivity::class.java))
                         },
-                        onConfirmClick = {
+                        onConfirmClick = { oldPassword, newPassword ->
                             // 此处添加原密码校验及新密码保存逻辑
-                            finish()
+                            lifecycleScope.launch {
+                                try {
+                                    val response = NetworkClient.apiService.changePassword(oldPassword, newPassword)
+                                    if (response.success) {
+                                        Toast.makeText(this@ChangePasswordActivity, "密码修改成功", Toast.LENGTH_SHORT).show()
+                                        finish()
+                                    } else {
+                                        Toast.makeText(this@ChangePasswordActivity, "修改失败: ${response.message}", Toast.LENGTH_SHORT).show()
+                                    }
+                                } catch (e: Exception) {
+                                    Toast.makeText(this@ChangePasswordActivity, "网络故障", Toast.LENGTH_SHORT).show()
+                                }
+                            }
                         }
                     )
                 }
@@ -50,11 +65,12 @@ fun ChangePasswordScreen(
     modifier: Modifier = Modifier,
     onBackClick: () -> Unit,
     onMobileVerifyClick: () -> Unit,
-    onConfirmClick: () -> Unit
+    onConfirmClick: (String, String) -> Unit
 ) {
     var oldPassword by remember { mutableStateOf("") }
     var newPassword by remember { mutableStateOf("") }
     var confirmPassword by remember { mutableStateOf("") }
+    var errorMessage by remember { mutableStateOf("") }
 
     Column(
         modifier = modifier.fillMaxSize(),
@@ -110,10 +126,47 @@ fun ChangePasswordScreen(
             modifier = Modifier.fillMaxWidth(0.85f)
         )
 
-        Spacer(modifier = Modifier.height(32.dp))
+        Spacer(modifier = Modifier.height(20.dp))
+        
+        // 错误提示
+        if (errorMessage.isNotEmpty()) {
+            Text(text = errorMessage, color = Color.Red, fontSize = 14.sp)
+            Spacer(modifier = Modifier.height(12.dp))
+        }
         
         Button(
-            onClick = onConfirmClick,
+            onClick = {
+                errorMessage = ""
+                
+                // 1. 验证原密码不为空
+                if (oldPassword.isEmpty()) {
+                    errorMessage = "请输入原密码"
+                    return@Button
+                }
+                
+                // 2. 验证新密码不为空且长度≥6位
+                if (newPassword.isEmpty()) {
+                    errorMessage = "请输入新密码"
+                    return@Button
+                }
+                if (newPassword.length < 6) {
+                    errorMessage = "新密码长度至少需要6位"
+                    return@Button
+                }
+                
+                // 3. 验证确认密码不为空且与新密码一致
+                if (confirmPassword.isEmpty()) {
+                    errorMessage = "请再次输入新密码"
+                    return@Button
+                }
+                if (newPassword != confirmPassword) {
+                    errorMessage = "两次输入的密码不一致"
+                    return@Button
+                }
+                
+                // 4. 调用修改密码接口
+                onConfirmClick(oldPassword, newPassword)
+            },
             modifier = Modifier.fillMaxWidth(0.85f),
             colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1A56DB)),
             shape = MaterialTheme.shapes.medium

@@ -1,13 +1,17 @@
 package com.example.travel
 
 import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -19,11 +23,13 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.lifecycleScope
+import coil.compose.AsyncImage
 import com.example.travel.ui.theme.TravelTheme
 import kotlinx.coroutines.launch
 
@@ -52,6 +58,9 @@ class PublishScenicInfoActivity : ComponentActivity() {
     }
 }
 
+private val SCENIC_LEVEL_OPTIONS = listOf("AAA", "AAAA", "AAAAA", "其他")
+
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PublishScenicInfoContent() {
     val context = LocalContext.current
@@ -65,20 +74,26 @@ fun PublishScenicInfoContent() {
     var scenicDetails by remember { mutableStateOf("") }
     var latitude by remember { mutableStateOf<Double?>(null) }
     var longitude by remember { mutableStateOf<Double?>(null) }
+    var selectedImageUri by remember { mutableStateOf<Uri?>(null) }
+    var levelMenuExpanded by remember { mutableStateOf(false) }
+
+    val imagePicker = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        selectedImageUri = uri
+    }
 
     val scrollState = rememberScrollState()
 
-    // 自动获取经纬度
-    LaunchedEffect(scenicName) {
-        if (scenicName.length > 2) {
+    LaunchedEffect(scenicLocation) {
+        if (scenicLocation.length > 2) {
             try {
-                val response = NetworkClient.apiService.geocode(scenicName)
+                val response = NetworkClient.apiService.geocode(scenicLocation)
                 if (response.success && response.data != null) {
                     latitude = response.data.latitude
                     longitude = response.data.longitude
                 }
-            } catch (e: Exception) {
-                // 静默失败
+            } catch (_: Exception) {
             }
         }
     }
@@ -109,20 +124,36 @@ fun PublishScenicInfoContent() {
         Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(20.dp)) {
             FormField("景点名称", scenicName, { scenicName = it }, "请输入景点名称")
 
-            // 图片占位
-            Box(
-                modifier = Modifier.fillMaxWidth().height(140.dp).background(Color(0xFFF5F5F5), RoundedCornerShape(8.dp)).border(1.dp, Color(0xFFE0E0E0), RoundedCornerShape(8.dp)),
-                contentAlignment = Alignment.Center
-            ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Icon(Icons.Default.Add, contentDescription = null, tint = Color.Gray)
-                    Text("点击上传图片", fontSize = 14.sp, color = Color.Gray)
+            Column {
+                Text("景点图片", fontSize = 16.sp, fontWeight = FontWeight.Medium)
+                Spacer(modifier = Modifier.height(8.dp))
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(160.dp)
+                        .background(Color(0xFFF5F5F5), RoundedCornerShape(8.dp))
+                        .border(1.dp, Color(0xFFE0E0E0), RoundedCornerShape(8.dp))
+                        .clickable { imagePicker.launch("image/*") },
+                    contentAlignment = Alignment.Center
+                ) {
+                    if (selectedImageUri != null) {
+                        AsyncImage(
+                            model = selectedImageUri,
+                            contentDescription = "已选图片",
+                            modifier = Modifier.fillMaxSize(),
+                            contentScale = ContentScale.Crop
+                        )
+                    } else {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Icon(Icons.Default.Add, contentDescription = null, tint = Color.Gray)
+                            Text("点击上传图片", fontSize = 14.sp, color = Color.Gray)
+                        }
+                    }
                 }
             }
 
             FormField("景点地点", scenicLocation, { scenicLocation = it }, "请输入详细地点")
-            
-            // 显示获取到的经纬度（只读展示）
+
             if (latitude != null && longitude != null) {
                 Text(
                     text = "已自动获取位置: 纬度 ${String.format("%.4f", latitude)}, 经度 ${String.format("%.4f", longitude)}",
@@ -133,7 +164,39 @@ fun PublishScenicInfoContent() {
 
             FormField("联系方式", contact, { contact = it }, "请输入联系电话")
             FormField("开放时间", openTime, { openTime = it }, "请输入开放时间")
-            FormField("景点等级", scenicLevel, { scenicLevel = it }, "请输入景点等级")
+
+            Column {
+                Text("景点等级", fontSize = 16.sp, fontWeight = FontWeight.Medium)
+                Spacer(modifier = Modifier.height(8.dp))
+                ExposedDropdownMenuBox(
+                    expanded = levelMenuExpanded,
+                    onExpandedChange = { levelMenuExpanded = it }
+                ) {
+                    OutlinedTextField(
+                        value = scenicLevel,
+                        onValueChange = {},
+                        readOnly = true,
+                        placeholder = { Text("请选择景点等级") },
+                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = levelMenuExpanded) },
+                        modifier = Modifier.menuAnchor().fillMaxWidth(),
+                        shape = RoundedCornerShape(8.dp)
+                    )
+                    ExposedDropdownMenu(
+                        expanded = levelMenuExpanded,
+                        onDismissRequest = { levelMenuExpanded = false }
+                    ) {
+                        SCENIC_LEVEL_OPTIONS.forEach { option ->
+                            DropdownMenuItem(
+                                text = { Text(option) },
+                                onClick = {
+                                    scenicLevel = option
+                                    levelMenuExpanded = false
+                                }
+                            )
+                        }
+                    }
+                }
+            }
 
             Column {
                 Text("景点详情", fontSize = 16.sp, fontWeight = FontWeight.Medium)
@@ -146,36 +209,53 @@ fun PublishScenicInfoContent() {
                 )
             }
 
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(8.dp))
 
             Button(
                 onClick = {
-                    if (scenicName.isEmpty() || scenicLocation.isEmpty()) {
-                        Toast.makeText(context, "请填写必填项", Toast.LENGTH_SHORT).show()
+                    if (scenicName.isBlank() || scenicLocation.isBlank()) {
+                        Toast.makeText(context, "请填写景点名称和地点", Toast.LENGTH_SHORT).show()
                         return@Button
                     }
-
+                    if (scenicLevel.isBlank()) {
+                        Toast.makeText(context, "请选择景点等级", Toast.LENGTH_SHORT).show()
+                        return@Button
+                    }
+                    if (!UserSession.isLoggedIn()) {
+                        Toast.makeText(context, "请先登录", Toast.LENGTH_SHORT).show()
+                        return@Button
+                    }
                     activity?.lifecycleScope?.launch {
                         try {
-                            val request = LandscapeRequest(
-                                title = scenicName,
-                                content = scenicDetails,
-                                address = scenicLocation,
-                                latitude = latitude,
-                                longitude = longitude,
-                                contactPhone = contact,
-                                openingTime = openTime,
-                                level = scenicLevel
+                            val imagePart = selectedImageUri?.let {
+                                MultipartUtil.imagePart(context, it)
+                            }
+                            val response = NetworkClient.apiService.publishLandscapeMultipart(
+                                title = MultipartUtil.textPart(scenicName),
+                                address = MultipartUtil.textPart(scenicLocation),
+                                content = MultipartUtil.textPart(scenicDetails.ifBlank { "" }),
+                                latitude = latitude?.let { MultipartUtil.textPart(it.toString()) },
+                                longitude = longitude?.let { MultipartUtil.textPart(it.toString()) },
+                                tel = contact.takeIf { it.isNotBlank() }?.let { MultipartUtil.textPart(it) },
+                                openingTime = openTime.takeIf { it.isNotBlank() }?.let { MultipartUtil.textPart(it) },
+                                level = MultipartUtil.textPart(scenicLevel),
+                                image = imagePart
                             )
-                            val response = NetworkClient.apiService.createLandscape(request)
-                            if (response.success) {
-                                Toast.makeText(context, "发布成功，等待审核", Toast.LENGTH_SHORT).show()
+                            if (response.success && response.data != null) {
+                                Toast.makeText(context, "发布成功，等待管理员审核", Toast.LENGTH_SHORT).show()
                                 activity.finish()
                             } else {
-                                Toast.makeText(context, "失败: ${response.message}", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, response.message ?: "发布失败", Toast.LENGTH_SHORT).show()
                             }
+                        } catch (e: retrofit2.HttpException) {
+                            val msg = when (e.code()) {
+                                405 -> "后端未更新：请 Rebuild 并重启 TravelWebApplication"
+                                404 -> "接口不存在，请确认后端已启动"
+                                else -> "请求失败 HTTP ${e.code()}"
+                            }
+                            Toast.makeText(context, msg, Toast.LENGTH_LONG).show()
                         } catch (e: Exception) {
-                            Toast.makeText(context, "网络错误", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(context, "网络错误: ${e.message}", Toast.LENGTH_SHORT).show()
                         }
                     }
                 },
@@ -189,5 +269,3 @@ fun PublishScenicInfoContent() {
         }
     }
 }
-
-

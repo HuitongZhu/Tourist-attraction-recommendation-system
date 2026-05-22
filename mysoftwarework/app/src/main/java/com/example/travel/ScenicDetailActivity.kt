@@ -12,7 +12,11 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.FavoriteBorder
+import androidx.compose.material.icons.filled.Place
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.outlined.Star
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -33,24 +37,52 @@ class ScenicDetailActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             TravelTheme {
-                Scaffold(
-                    bottomBar = { CommentInputBar(landscapeId = landscapeId, postId = null) }
-                ) { innerPadding ->
-                    Box(modifier = Modifier.padding(innerPadding).fillMaxSize()) {
-                        ScenicDetailContent(landscapeId)
-                    }
-                }
+                ScenicDetailScreen(landscapeId)
             }
         }
     }
 }
 
 @Composable
-fun ScenicDetailContent(landscapeId: String) {
+fun ScenicDetailScreen(landscapeId: String) {
+    val scope = rememberCoroutineScope()
+    var comments by remember { mutableStateOf<List<CommentResponse>>(emptyList()) }
+
+    suspend fun loadComments() {
+        try {
+            val res = NetworkClient.apiService.getComments(landscapeId = landscapeId)
+            if (res.success) {
+                comments = res.data?.content ?: emptyList()
+            }
+        } catch (e: Exception) {
+            Log.e("ScenicDetail", "Error loading comments: ${e.message}", e)
+        }
+    }
+
+    LaunchedEffect(landscapeId) {
+        loadComments()
+    }
+
+    Scaffold(
+        bottomBar = {
+            CommentInputBar(
+                landscapeId = landscapeId,
+                postId = null,
+                onCommentPosted = { scope.launch { loadComments() } }
+            )
+        }
+    ) { innerPadding ->
+        Box(modifier = Modifier.padding(innerPadding).fillMaxSize()) {
+            ScenicDetailContent(landscapeId = landscapeId, comments = comments)
+        }
+    }
+}
+
+@Composable
+fun ScenicDetailContent(landscapeId: String, comments: List<CommentResponse>) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var landscape by remember { mutableStateOf<LandscapeResponse?>(null) }
-    var comments by remember { mutableStateOf<List<CommentResponse>>(emptyList()) }
     var isLiked by remember { mutableStateOf(false) }
     var isFavorited by remember { mutableStateOf(false) }
 
@@ -66,6 +98,12 @@ fun ScenicDetailContent(landscapeId: String) {
                 }
             } else if (body != null) {
                 Toast.makeText(context, body.message ?: "景点不存在或未审核", Toast.LENGTH_SHORT).show()
+            }
+            if (UserSession.isLoggedIn()) {
+                InteractionHelper.loadLandscapeStatus(landscapeId)?.let { status ->
+                    isLiked = status.liked
+                    isFavorited = status.favorited
+                }
             }
         } catch (e: Exception) {
             Log.e("ScenicDetail", "Error loading landscape: ${e.message}", e)
@@ -92,37 +130,51 @@ fun ScenicDetailContent(landscapeId: String) {
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 IconButton(onClick = {
+                    if (!UserSession.isLoggedIn()) {
+                        Toast.makeText(context, "请先登录", Toast.LENGTH_SHORT).show()
+                        return@IconButton
+                    }
                     scope.launch {
                         try {
-                            val res = if (isLiked) NetworkClient.apiService.deleteLike(landscapeId)
-                                      else NetworkClient.apiService.addLike(LikeRequest("LANDSCAPE", landscapeId = landscapeId))
-                            if (res.success) {
-                                isLiked = !isLiked
+                            val liked = InteractionHelper.toggleLandscapeLike(landscapeId)
+                            if (liked != null) {
+                                isLiked = liked
                                 Toast.makeText(context, if (isLiked) "已点赞" else "已取消点赞", Toast.LENGTH_SHORT).show()
+                            } else {
+                                Toast.makeText(context, "操作失败", Toast.LENGTH_SHORT).show()
                             }
-                        } catch (e: Exception) { }
+                        } catch (e: Exception) {
+                            Toast.makeText(context, "网络异常", Toast.LENGTH_SHORT).show()
+                        }
                     }
                 }) {
                     Icon(
-                        imageVector = if (isLiked) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                        imageVector = if (isLiked) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
                         contentDescription = "Like",
                         tint = if (isLiked) Color.Red else Color.White
                     )
                 }
                 IconButton(onClick = {
+                    if (!UserSession.isLoggedIn()) {
+                        Toast.makeText(context, "请先登录", Toast.LENGTH_SHORT).show()
+                        return@IconButton
+                    }
                     scope.launch {
                         try {
-                            val res = if (isFavorited) NetworkClient.apiService.deleteFavorite(landscapeId)
-                                      else NetworkClient.apiService.addFavorite(FavoriteRequest("LANDSCAPE", landscapeId = landscapeId))
-                            if (res.success) {
-                                isFavorited = !isFavorited
+                            val favorited = InteractionHelper.toggleLandscapeFavorite(landscapeId)
+                            if (favorited != null) {
+                                isFavorited = favorited
                                 Toast.makeText(context, if (isFavorited) "已收藏" else "已取消收藏", Toast.LENGTH_SHORT).show()
+                            } else {
+                                Toast.makeText(context, "操作失败", Toast.LENGTH_SHORT).show()
                             }
-                        } catch (e: Exception) { }
+                        } catch (e: Exception) {
+                            Toast.makeText(context, "网络异常", Toast.LENGTH_SHORT).show()
+                        }
                     }
                 }) {
                     Icon(
-                        imageVector = if (isFavorited) Icons.Default.Star else Icons.Default.FavoriteBorder,
+                        imageVector = if (isFavorited) Icons.Filled.Star else Icons.Outlined.Star,
                         contentDescription = "Favorite",
                         tint = if (isFavorited) Color(0xFFFFD700) else Color.White
                     )
@@ -165,7 +217,7 @@ fun ScenicDetailContent(landscapeId: String) {
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Icon(
-                        imageVector = Icons.Default.Place,
+                        imageVector = Icons.Filled.Place,
                         contentDescription = "Map",
                         tint = Color.Blue,
                         modifier = Modifier.size(64.dp)

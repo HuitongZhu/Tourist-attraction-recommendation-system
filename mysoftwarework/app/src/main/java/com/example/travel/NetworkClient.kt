@@ -10,7 +10,14 @@ object NetworkClient {
     // 1. 更新为后端最新的 IP 地址
     // 注意：Android模拟器访问本地服务器需要使用 10.0.2.2
     // 如果是真实设备测试，使用开发机的局域网IP（如 192.168.x.x）
-    private const val BASE_URL = "http://10.100.143.145:8080/"
+    const val BASE_URL = "http://10.100.143.145:8080/"
+
+    fun mediaUrl(path: String?): String? {
+        if (path.isNullOrBlank()) return null
+        if (path.startsWith("http://") || path.startsWith("https://")) return path
+        val normalized = if (path.startsWith("/")) path.drop(1) else path
+        return BASE_URL + normalized
+    }
 
     // 用于保存登录后的用户信息（实际开发中建议存入 SharedPreferences）
     var userToken: String? = null
@@ -27,14 +34,15 @@ object NetworkClient {
         val original = chain.request()
         val requestBuilder = original.newBuilder()
 
-        // 如果 token 不为空且不是登录/注册接口，则添加 Header
+        // 如果 userId 不为空且不是登录/注册接口，则添加 Header
         val path = original.url.encodedPath
-        if (!userToken.isNullOrEmpty()) {
-            // 登录和注册接口不需要 token
-            if (!path.contains("/api/login") && 
-                !path.contains("/api/register") && 
+        val userId = NetworkClient.userId
+        if (!userId.isNullOrEmpty()) {
+            // 登录和注册接口不需要 userId
+            if (!path.contains("/api/login") &&
+                !path.contains("/api/register") &&
                 !path.contains("/api/send-sms-code")) {
-                requestBuilder.header("X-User-Id", userToken)
+                requestBuilder.header("X-User-Id", userId)
             }
         }
 

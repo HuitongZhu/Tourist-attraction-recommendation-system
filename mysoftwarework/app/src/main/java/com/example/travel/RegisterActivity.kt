@@ -27,6 +27,13 @@ import androidx.lifecycle.lifecycleScope
 import com.example.travel.ui.theme.TravelTheme
 import kotlinx.coroutines.launch
 
+enum class UsernameStatus {
+    None,
+    Checking,
+    Available,
+    Exists
+}
+
 class RegisterActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -87,6 +94,21 @@ class RegisterActivity : ComponentActivity() {
                                     showError("网络异常")
                                 }
                             }
+                        },
+                        onCheckUsername = { username, callback ->
+                            lifecycleScope.launch {
+                                try {
+                                    val response = NetworkClient.apiService.checkUsername(username = username)
+                                    if (response.success) {
+                                        val isAvailable = response.data?.available == true
+                                        callback(isAvailable, "")
+                                    } else {
+                                        callback(false, "")
+                                    }
+                                } catch (e: Exception) {
+                                    callback(false, "")
+                                }
+                            }
                         }
                     )
                 }
@@ -100,7 +122,8 @@ fun RegisterScreen(
     modifier: Modifier = Modifier,
     onLoginClick: () -> Unit,
     onRegisterClick: (RegisterRequest, (String) -> Unit) -> Unit,
-    onSendSmsClick: (String, (String) -> Unit) -> Unit
+    onSendSmsClick: (String, (String) -> Unit) -> Unit,
+    onCheckUsername: (String, (Boolean, String) -> Unit) -> Unit
 ) {
     var username by remember { mutableStateOf("") }
     var phone by remember { mutableStateOf("") }
@@ -112,6 +135,7 @@ fun RegisterScreen(
     var gender by remember { mutableStateOf("") }
     var birthday by remember { mutableStateOf("") }
     var errorMessage by remember { mutableStateOf("") }
+    var usernameStatus by remember { mutableStateOf<UsernameStatus>(UsernameStatus.None) }
 
     Column(
         modifier = modifier
@@ -129,7 +153,23 @@ fun RegisterScreen(
 
         // 基础必填信息
         SectionTitle("基础账号信息")
-        CustomRegisterField(value = username, onValueChange = { username = it }, label = "用户名 (必填)")
+        CustomRegisterField(
+            value = username, 
+            onValueChange = { 
+                username = it 
+                // 当用户名长度>=2时触发检查
+                if (it.length >= 2) {
+                    usernameStatus = UsernameStatus.Checking
+                    onCheckUsername(it) { isAvailable, _ ->
+                        usernameStatus = if (isAvailable) UsernameStatus.Available else UsernameStatus.Exists
+                    }
+                } else {
+                    usernameStatus = UsernameStatus.None
+                }
+            }, 
+            label = "用户名 (必填)",
+            status = usernameStatus
+        )
         CustomRegisterField(value = phone, onValueChange = { phone = it }, label = "手机号 (必填)", keyboardType = KeyboardType.Phone)
         
         Row(
@@ -175,14 +215,37 @@ fun RegisterScreen(
         Button(
             onClick = {
                 errorMessage = ""
+                
+                // 1. 检查所有必填项
                 if (username.isEmpty() || phone.isEmpty() || password.isEmpty() || smsCode.isEmpty() || confirmPassword.isEmpty()) {
                     errorMessage = "请填写所有必填项"
                     return@Button
                 }
+                
+                // 2. 检查用户名是否可用（如果已经检查过）
+                if (usernameStatus == UsernameStatus.Exists) {
+                    errorMessage = "该用户名已被注册"
+                    return@Button
+                }
+                
+                // 3. 检查密码长度（6位及以上）
+                if (password.length < 6) {
+                    errorMessage = "密码长度至少需要6位"
+                    return@Button
+                }
+                
+                // 4. 检查两次密码是否一致
                 if (password != confirmPassword) {
                     errorMessage = "两次输入的密码不一致"
                     return@Button
                 }
+                
+                // 5. 检查手机号格式（必须11位数字）
+                if (!phone.matches(Regex("^\\d{11}$"))) {
+                    errorMessage = "请输入正确的11位手机号"
+                    return@Button
+                }
+                
                 onRegisterClick(
                     RegisterRequest(
                         username = username,
@@ -236,16 +299,36 @@ fun CustomRegisterField(
     onValueChange: (String) -> Unit,
     label: String,
     isPassword: Boolean = false,
-    keyboardType: KeyboardType = KeyboardType.Text
+    keyboardType: KeyboardType = KeyboardType.Text,
+    status: UsernameStatus = UsernameStatus.None
 ) {
-    OutlinedTextField(
-        value = value,
-        onValueChange = onValueChange,
-        label = { Text(label) },
-        visualTransformation = if (isPassword) PasswordVisualTransformation() else androidx.compose.ui.text.input.VisualTransformation.None,
-        keyboardOptions = KeyboardOptions(keyboardType = keyboardType),
-        modifier = Modifier.fillMaxWidth(0.8f).padding(vertical = 6.dp),
-        singleLine = true,
-        shape = RoundedCornerShape(12.dp)
-    )
+    Column(modifier = Modifier.fillMaxWidth(0.8f).padding(vertical = 6.dp)) {
+        OutlinedTextField(
+            value = value,
+            onValueChange = onValueChange,
+            label = { Text(label) },
+            visualTransformation = if (isPassword) PasswordVisualTransformation() else androidx.compose.ui.text.input.VisualTransformation.None,
+            keyboardOptions = KeyboardOptions(keyboardType = keyboardType),
+            modifier = Modifier.fillMaxWidth(),
+            singleLine = true,
+            shape = RoundedCornerShape(12.dp)
+        )
+        // 显示用户名检查状态
+        if (status != UsernameStatus.None) {
+            Row(modifier = Modifier.padding(top = 4.dp)) {
+                when (status) {
+                    UsernameStatus.Checking -> {
+                        Text(text = "检查中...", color = Color.Gray, fontSize = 12.sp)
+                    }
+                    UsernameStatus.Available -> {
+                        Text(text = "✓ 用户名可用", color = Color.Green, fontSize = 12.sp)
+                    }
+                    UsernameStatus.Exists -> {
+                        Text(text = "✗ 用户名已被使用", color = Color.Red, fontSize = 12.sp)
+                    }
+                    else -> {}
+                }
+            }
+        }
+    }
 }

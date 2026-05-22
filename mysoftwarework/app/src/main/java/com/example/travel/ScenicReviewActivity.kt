@@ -37,10 +37,8 @@ class ScenicReviewActivity : ComponentActivity() {
             TravelTheme {
                 Column(modifier = Modifier.fillMaxSize().background(Color.White)) {
                     AdminTopNavBar()
-
                     Row(modifier = Modifier.fillMaxSize()) {
                         AdminSidebar(selectedModule = "SCENIC")
-
                         Box(modifier = Modifier.weight(1f).padding(top = 16.dp, end = 16.dp, bottom = 16.dp)) {
                             ScenicReviewMainContent()
                         }
@@ -59,18 +57,20 @@ fun ScenicReviewMainContent() {
     var refreshTrigger by remember { mutableStateOf(0) }
     var scenicInfos by remember { mutableStateOf<List<LandscapeResponse>>(emptyList()) }
     var isLoading by remember { mutableStateOf(false) }
-    
-    var selectedStatus by remember { mutableStateOf("未审核") }
+    var selectedFilter by remember { mutableStateOf(AdminReviewFilter.ALL) }
 
-    LaunchedEffect(searchText, refreshTrigger, selectedStatus) {
+    LaunchedEffect(searchText, refreshTrigger, selectedFilter) {
         isLoading = true
         try {
-            val response = NetworkClient.apiService.getLandscapes(
-                keyword = if (searchText.isEmpty()) null else searchText,
-                status = selectedStatus
+            val response = NetworkClient.apiService.getAdminReviewLandscapes(
+                filter = selectedFilter,
+                keyword = if (searchText.isEmpty()) null else searchText
             )
             if (response.success) {
-                scenicInfos = response.data?.content ?: emptyList()
+                scenicInfos = (response.data ?: emptyList())
+                    .sortedBy { AdminReviewFilter.auditSortOrder(it.status) }
+            } else {
+                Toast.makeText(context, response.message ?: "加载失败", Toast.LENGTH_SHORT).show()
             }
         } catch (e: Exception) {
             Toast.makeText(context, "网络错误", Toast.LENGTH_SHORT).show()
@@ -81,17 +81,9 @@ fun ScenicReviewMainContent() {
 
     Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
         Text("景点信息审核", fontSize = 30.sp, fontWeight = FontWeight.Bold)
-
         Spacer(modifier = Modifier.height(16.dp))
-
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            StatusChip("待审核", selectedStatus == "未审核") { selectedStatus = "未审核" }
-            StatusChip("已通过", selectedStatus == "审核通过") { selectedStatus = "审核通过" }
-            StatusChip("已驳回", selectedStatus == "审核未通过") { selectedStatus = "审核未通过" }
-        }
-
+        ReviewFilterRow(selectedFilter = selectedFilter, onFilterChange = { selectedFilter = it })
         Spacer(modifier = Modifier.height(16.dp))
-
         OutlinedTextField(
             value = searchText,
             onValueChange = { searchText = it },
@@ -104,14 +96,16 @@ fun ScenicReviewMainContent() {
                 focusedBorderColor = Color(0xFF1A56DB)
             )
         )
-
         Spacer(modifier = Modifier.height(24.dp))
-
         if (isLoading) {
             Box(Modifier.fillMaxSize(), Alignment.Center) { CircularProgressIndicator() }
+        } else if (scenicInfos.isEmpty()) {
+            Box(Modifier.fillMaxSize(), Alignment.Center) {
+                Text("暂无数据", color = Color.Gray, fontSize = 18.sp)
+            }
         } else {
             LazyColumn(verticalArrangement = Arrangement.spacedBy(20.dp)) {
-                items(scenicInfos) { scenic ->
+                items(scenicInfos, key = { it.id }) { scenic ->
                     ScenicReviewItem(scenicInfo = scenic, onAudit = { refreshTrigger++ })
                 }
             }
@@ -123,6 +117,10 @@ fun ScenicReviewMainContent() {
 fun ScenicReviewItem(scenicInfo: LandscapeResponse, onAudit: () -> Unit) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    val displayStatus = AdminReviewFilter.displayStatus(scenicInfo.status)
+    val pending = AdminReviewFilter.isPendingStatus(scenicInfo.status)
+    val imageModel = NetworkClient.mediaUrl(scenicInfo.imagePath)
+        ?: "https://via.placeholder.com/400x200.png?text=${scenicInfo.title}"
 
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -132,31 +130,30 @@ fun ScenicReviewItem(scenicInfo: LandscapeResponse, onAudit: () -> Unit) {
     ) {
         Column {
             AsyncImage(
-                model = "https://via.placeholder.com/400x200.png?text=${scenicInfo.title}",
+                model = imageModel,
                 contentDescription = null,
                 modifier = Modifier.fillMaxWidth().height(200.dp)
             )
             Column(modifier = Modifier.padding(20.dp)) {
                 Row(Modifier.fillMaxWidth(), Arrangement.SpaceBetween, Alignment.CenterVertically) {
-                    Column {
+                    Column(modifier = Modifier.weight(1f)) {
                         Text(text = scenicInfo.title, fontSize = 26.sp, fontWeight = FontWeight.Bold)
-                        Text(text = "提交人: ${scenicInfo.creator?.username ?: "未知"}", fontSize = 18.sp, color = Color.Gray)
+                        Text(text = "地点: ${scenicInfo.address}", fontSize = 16.sp, color = Color.Gray)
                     }
-                    val statusColor = when(scenicInfo.status) {
-                        "未审核" -> Color(0xFFFF9800)
-                        "审核通过" -> Color(0xFF2E7D32)
-                        "审核未通过" -> Color.Red
+                    val statusColor = when {
+                        pending -> Color(0xFFFF9800)
+                        AdminReviewFilter.isApprovedStatus(scenicInfo.status) -> Color(0xFF2E7D32)
+                        scenicInfo.status == "审核未通过" -> Color.Red
                         else -> Color.Gray
                     }
-                    Text(text = scenicInfo.status, fontSize = 18.sp, color = statusColor, fontWeight = FontWeight.Medium)
+                    Text(text = displayStatus, fontSize = 18.sp, color = statusColor, fontWeight = FontWeight.Medium)
                 }
                 Spacer(Modifier.height(12.dp))
                 Text(text = scenicInfo.content, fontSize = 18.sp, color = Color.Gray, maxLines = 2)
                 Spacer(Modifier.height(20.dp))
-                
                 Row(Modifier.fillMaxWidth(), Arrangement.spacedBy(12.dp)) {
                     OutlinedButton(
-                        onClick = { 
+                        onClick = {
                             val intent = Intent(context, ScenicDetailActivity::class.java)
                             intent.putExtra("landscapeId", scenicInfo.id)
                             context.startActivity(intent)
@@ -169,18 +166,24 @@ fun ScenicReviewItem(scenicInfo: LandscapeResponse, onAudit: () -> Unit) {
                         Spacer(Modifier.width(6.dp))
                         Text("查看详情", color = Color(0xFF1A56DB), fontSize = 18.sp)
                     }
-
-                    if (scenicInfo.status == "未审核") {
+                    if (pending) {
                         Button(
-                            onClick = { 
+                            onClick = {
                                 scope.launch {
                                     try {
-                                        val res = NetworkClient.apiService.auditLandscape(scenicInfo.id, AuditRequest(true, "审核通过"))
+                                        val res = NetworkClient.apiService.auditLandscape(
+                                            scenicInfo.id,
+                                            AuditRequest(approved = true, remark = "审核通过")
+                                        )
                                         if (res.success) {
                                             Toast.makeText(context, "审核通过", Toast.LENGTH_SHORT).show()
                                             onAudit()
+                                        } else {
+                                            Toast.makeText(context, res.message ?: "操作失败", Toast.LENGTH_SHORT).show()
                                         }
-                                    } catch (e: Exception) { }
+                                    } catch (_: Exception) {
+                                        Toast.makeText(context, "操作失败", Toast.LENGTH_SHORT).show()
+                                    }
                                 }
                             },
                             modifier = Modifier.weight(1f).height(54.dp),
@@ -193,19 +196,25 @@ fun ScenicReviewItem(scenicInfo: LandscapeResponse, onAudit: () -> Unit) {
                         }
                     }
                 }
-
-                if (scenicInfo.status == "未审核") {
+                if (pending) {
                     Spacer(Modifier.height(12.dp))
                     OutlinedButton(
-                        onClick = { 
+                        onClick = {
                             scope.launch {
                                 try {
-                                    val res = NetworkClient.apiService.auditLandscape(scenicInfo.id, AuditRequest(false, "驳回审核"))
+                                    val res = NetworkClient.apiService.auditLandscape(
+                                        scenicInfo.id,
+                                        AuditRequest(approved = false, remark = "审核未通过")
+                                    )
                                     if (res.success) {
                                         Toast.makeText(context, "已驳回", Toast.LENGTH_SHORT).show()
                                         onAudit()
+                                    } else {
+                                        Toast.makeText(context, res.message ?: "操作失败", Toast.LENGTH_SHORT).show()
                                     }
-                                } catch (e: Exception) { }
+                                } catch (_: Exception) {
+                                    Toast.makeText(context, "操作失败", Toast.LENGTH_SHORT).show()
+                                }
                             }
                         },
                         modifier = Modifier.fillMaxWidth().height(54.dp),

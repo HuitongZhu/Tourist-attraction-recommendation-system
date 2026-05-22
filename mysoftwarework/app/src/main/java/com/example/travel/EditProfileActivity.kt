@@ -45,11 +45,8 @@ class EditProfileActivity : ComponentActivity() {
                         val response = NetworkClient.apiService.getCurrentUser()
                         if (response.success && response.data != null) {
                             val user = response.data
-                            username = user.username
-                            realName = user.realName ?: ""
-                            gender = user.gender ?: ""
-                            birthday = user.birthday ?: ""
-                            phone = user.phone
+                            username = user.userName ?: ""
+                            phone = user.phoneNumber ?: ""
                         }
                     } catch (e: Exception) {
                         Toast.makeText(this@EditProfileActivity, "获取个人资料失败", Toast.LENGTH_SHORT).show()
@@ -81,20 +78,25 @@ class EditProfileActivity : ComponentActivity() {
                         Spacer(modifier = Modifier.height(20.dp))
 
                         // 输入框同步状态
-                        OutlinedTextField(value = username, onValueChange = { username = it }, label = { Text("用户名") }, modifier = Modifier.fillMaxWidth())
+                        OutlinedTextField(value = username, onValueChange = { username = it }, label = { Text("用户名") }, modifier = Modifier.fillMaxWidth(), readOnly = true)
                         OutlinedTextField(value = realName, onValueChange = { realName = it }, label = { Text("真实姓名") }, modifier = Modifier.fillMaxWidth())
                         OutlinedTextField(value = gender, onValueChange = { gender = it }, label = { Text("性别") }, modifier = Modifier.fillMaxWidth())
-                        OutlinedTextField(value = birthday, onValueChange = { birthday = it }, label = { Text("生日") }, modifier = Modifier.fillMaxWidth())
+                        OutlinedTextField(value = birthday, onValueChange = { birthday = it }, label = { Text("生日 (YYYY-MM-DD)") }, modifier = Modifier.fillMaxWidth())
                         OutlinedTextField(value = phone, onValueChange = { phone = it }, label = { Text("手机号") }, modifier = Modifier.fillMaxWidth(), readOnly = true)
 
-                        Spacer(modifier = Modifier.height(40.dp))
+                        Spacer(modifier = Modifier.height(20.dp))
 
                         Button(
                             onClick = {
-                                // 3. 点击保存，将数据同步回数据库
+                                // 1. 验证：至少修改一项
+                                if (realName.isEmpty() && gender.isEmpty() && birthday.isEmpty()) {
+                                    Toast.makeText(this@EditProfileActivity, "请至少修改一项信息", Toast.LENGTH_SHORT).show()
+                                    return@Button
+                                }
+                                
+                                // 2. 点击保存，将数据同步回数据库
                                 lifecycleScope.launch {
                                     try {
-                                        // 修改资料通常不需要再次验证短信或密码
                                         val req = UpdateProfileRequest(
                                             realName = realName.ifEmpty { null },
                                             gender = gender.ifEmpty { null },

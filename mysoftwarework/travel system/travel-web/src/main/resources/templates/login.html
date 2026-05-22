@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="zh-CN" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8"/>
+    <title>登录 - 旅游景点推荐系统</title>
+    <link rel="stylesheet" th:href="@{/css/app.css}"/>
+    <style>
+        body { background: #f8f9fa; }
+        .split { display: flex; min-height: 100vh; }
+        .side { width: 280px; background: #f0f7ff; padding: 40px 24px; box-sizing: border-box; }
+        .main { flex: 1; display: flex; align-items: center; justify-content: center; }
+        .box { width: 420px; background: #fff; padding: 32px; border-radius: 10px; box-shadow: 0 4px 24px rgba(0,0,0,.06); }
+        h1 { font-size: 20px; margin: 0 0 20px; color: #333; }
+        .radio-group { display: flex; gap: 24px; }
+        .radio-item { display: flex; align-items: center; gap: 8px; cursor: pointer; }
+        .radio-item input[type="radio"] { width: 18px; height: 18px; }
+        .radio-item label { font-size: 14px; color: #333; }
+        
+        .login-tabs { display: flex; margin-bottom: 20px; border-bottom: 1px solid #e9ecef; }
+        .login-tab { 
+            padding: 8px 16px; 
+            font-size: 14px; 
+            cursor: pointer; 
+            border: none; 
+            background: none;
+            color: #6c757d;
+            position: relative;
+            margin-right: 24px;
+            padding-bottom: 10px;
+        }
+        .login-tab.active { 
+            color: #0d6efd; 
+            font-weight: 500;
+        }
+        .login-tab.active::after {
+            content: '';
+            position: absolute;
+            bottom: -1px;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: #0d6efd;
+        }
+        
+        .code-btn {
+            background: #f0f7ff;
+            color: #0d6efd;
+            border: 1px solid #b6d4fe;
+            padding: 10px 12px;
+            border-radius: 0 4px 4px 0;
+            cursor: pointer;
+            font-size: 12px;
+            white-space: nowrap;
+            width: 90px;
+            text-align: center;
+        }
+        .code-btn:hover {
+            background: #e0ebff;
+        }
+        .code-btn.disabled {
+            background: #f8f9fa;
+            color: #adb5bd;
+            border-color: #dee2e6;
+            cursor: not-allowed;
+        }
+        
+        .input-group {
+            display: flex;
+            align-items: center;
+        }
+        .input-group input {
+            border-radius: 4px 0 0 4px;
+            border-right: none;
+            flex: 1;
+        }
+        .input-group .code-btn {
+            border-left: none;
+            border-radius: 0 4px 4px 0;
+            padding: 10px 12px;
+        }
+    </style>
+</head>
+<body>
+<div class="split">
+    <div class="side">
+        <div class="logo-text" style="margin-bottom:12px">旅游景点推荐系统</div>
+        <p style="font-size:13px;color:#6c757d;line-height:1.6">旅游景点推荐系统，让你的旅行更加轻松愉快，发现更多美好的景点。</p>
+        <p style="margin-top:24px"><a class="btn btn-outline btn-sm" th:href="@{/register}">创建一个账户</a></p>
+    </div>
+    <div class="main">
+        <div class="box">
+            <h1>使用现有账户登录</h1>
+            <div th:if="${error}" class="alert alert-error" th:text="${error}"></div>
+            <div th:if="${msg}" class="alert alert-info" th:text="${msg}"></div>
+            
+            <form th:action="@{/login}" method="post" id="loginForm">
+                <input type="hidden" name="next" th:value="${next}"/>
+                <input type="hidden" name="loginType" id="loginType" th:value="${loginType != null ? loginType : 'password'}"/>
+                
+                <!-- 身份选择 -->
+                <div class="form-row">
+                    <label>选择登录身份</label>
+                    <div class="radio-group">
+                        <div class="radio-item">
+                            <input type="radio" id="userType1" name="userType" value="1" th:checked="${userType == null || userType == '1'}" />
+                            <label for="userType1">管理员</label>
+                        </div>
+                        <div class="radio-item">
+                            <input type="radio" id="userType2" name="userType" value="2" th:checked="${userType == '2'}" />
+                            <label for="userType2">普通用户</label>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 登录方式切换（管理员不显示） -->
+                <div class="login-tabs" id="loginTabs">
+                    <button type="button" class="login-tab active" id="tabPassword">账号密码登录</button>
+                    <button type="button" class="login-tab" id="tabSms">短信验证码登录</button>
+                </div>
+                
+                <!-- 账号输入 -->
+                <div class="form-row">
+                    <label id="accountLabel">账号</label>
+                    <input class="layui-input" name="account" id="account" required placeholder="请输入账号" th:value="${account}"/>
+                </div>
+                
+                <!-- 密码输入 -->
+                <div class="form-row" id="passwordRow">
+                    <label>密码</label>
+                    <input class="layui-input" type="password" name="password" required placeholder="请输入密码"/>
+                </div>
+                
+                <!-- 验证码输入 -->
+                <div class="form-row" id="codeRow" style="display: none;">
+                    <label>验证码</label>
+                    <div class="input-group">
+                        <input class="layui-input" name="code" placeholder="请输入验证码"/>
+                        <button type="button" class="code-btn" id="sendCodeBtn">发送验证码</button>
+                    </div>
+                </div>
+                
+                <!-- 其他登录方式提示 -->
+                <div style="display: flex; justify-content: space-between; font-size: 12px; color: #6c757d; margin-top: 8px;">
+                    <a href="#" id="switchTip" style="color: #0d6efd;">短信验证码登录</a>
+                    <a href="/forgot-password" id="forgotPassword" style="color: #0d6efd;">忘记密码?</a>
+                </div>
+                
+                <button type="submit" class="btn btn-primary" style="width:100%;margin-top:16px">登录</button>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        var tabPassword = document.getElementById('tabPassword');
+        var tabSms = document.getElementById('tabSms');
+        var passwordRow = document.getElementById('passwordRow');
+        var codeRow = document.getElementById('codeRow');
+        var loginType = document.getElementById('loginType');
+        var accountLabel = document.getElementById('accountLabel');
+        var switchTip = document.getElementById('switchTip');
+        var sendCodeBtn = document.getElementById('sendCodeBtn');
+        var accountInput = document.getElementById('account');
+        var loginTabs = document.getElementById('loginTabs');
+        var userType1 = document.getElementById('userType1');
+        var userType2 = document.getElementById('userType2');
+        var forgotPassword = document.getElementById('forgotPassword');
+        
+        function updateUIForUserType() {
+            var isAdmin = userType1.checked;
+            
+            if (isAdmin) {
+                loginTabs.style.display = 'none';
+                switchTip.style.display = 'none';
+                forgotPassword.style.display = 'none';
+                passwordRow.style.display = 'block';
+                codeRow.style.display = 'none';
+                loginType.value = 'password';
+                accountLabel.textContent = '账号';
+                accountInput.placeholder = '请输入账号';
+                accountInput.required = true;
+                document.querySelector('input[name="password"]').required = true;
+                document.querySelector('input[name="code"]').required = false;
+            } else {
+                loginTabs.style.display = 'flex';
+                switchTip.style.display = 'inline';
+                forgotPassword.style.display = 'inline';
+                if (loginType.value === 'password') {
+                    passwordRow.style.display = 'block';
+                    codeRow.style.display = 'none';
+                    accountLabel.textContent = '账号/手机号';
+                    accountInput.placeholder = '请输入账号/手机号';
+                    document.querySelector('input[name="password"]').required = true;
+                    document.querySelector('input[name="code"]').required = false;
+                    tabPassword.classList.add('active');
+                    tabSms.classList.remove('active');
+                } else {
+                    passwordRow.style.display = 'none';
+                    codeRow.style.display = 'block';
+                    accountLabel.textContent = '手机号';
+                    accountInput.placeholder = '请输入手机号';
+                    document.querySelector('input[name="password"]').required = false;
+                    document.querySelector('input[name="code"]').required = true;
+                    tabSms.classList.add('active');
+                    tabPassword.classList.remove('active');
+                }
+            }
+        }
+        
+        userType1.addEventListener('change', updateUIForUserType);
+        userType2.addEventListener('change', updateUIForUserType);
+        
+        tabPassword.addEventListener('click', function(e) {
+            e.preventDefault();
+            tabPassword.classList.add('active');
+            tabSms.classList.remove('active');
+            passwordRow.style.display = 'block';
+            codeRow.style.display = 'none';
+            loginType.value = 'password';
+            accountLabel.textContent = '账号/手机号';
+            accountInput.placeholder = '请输入账号/手机号';
+            switchTip.textContent = '短信验证码登录';
+            document.querySelector('input[name="password"]').required = true;
+            document.querySelector('input[name="code"]').required = false;
+        });
+        
+        tabSms.addEventListener('click', function(e) {
+            e.preventDefault();
+            tabSms.classList.add('active');
+            tabPassword.classList.remove('active');
+            passwordRow.style.display = 'none';
+            codeRow.style.display = 'block';
+            loginType.value = 'sms';
+            accountLabel.textContent = '手机号';
+            accountInput.placeholder = '请输入手机号';
+            switchTip.textContent = '账号密码登录';
+            document.querySelector('input[name="password"]').required = false;
+            document.querySelector('input[name="code"]').required = true;
+        });
+        
+        switchTip.addEventListener('click', function() {
+            if (loginType.value === 'password') {
+                tabSms.click();
+            } else {
+                tabPassword.click();
+            }
+        });
+        
+        sendCodeBtn.addEventListener('click', function() {
+            var phone = accountInput.value.trim();
+            if (!phone) {
+                alert('请先输入手机号');
+                return;
+            }
+            
+            if (!/^1[3-9]\d{9}$/.test(phone)) {
+                alert('请输入正确的手机号格式');
+                return;
+            }
+            
+            var btn = this;
+            btn.classList.add('disabled');
+            btn.textContent = '发送中...';
+            
+            fetch('/send-sms-code', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: 'phone=' + encodeURIComponent(phone)
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    alert('验证码: ' + data.code);
+                    var count = 60;
+                    btn.textContent = count + '秒后重发';
+                    var timer = setInterval(function() {
+                        count--;
+                        if (count <= 0) {
+                            clearInterval(timer);
+                            btn.textContent = '发送验证码';
+                            btn.classList.remove('disabled');
+                        } else {
+                            btn.textContent = count + '秒后重发';
+                        }
+                    }, 1000);
+                } else {
+                    alert(data.message);
+                    btn.textContent = '发送验证码';
+                    btn.classList.remove('disabled');
+                }
+            })
+            .catch(error => {
+                alert('发送失败，请稍后重试');
+                btn.textContent = '发送验证码';
+                btn.classList.remove('disabled');
+            });
+        });
+        
+        updateUIForUserType();
+    });
+</script>
+</body>
+</html>

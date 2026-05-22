@@ -1,6 +1,7 @@
 package com.example.travel
 
 import android.os.Bundle
+import android.util.Log
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -11,7 +12,10 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.FavoriteBorder
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.outlined.Star
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -32,24 +36,52 @@ class PostDetailActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             TravelTheme {
-                Scaffold(
-                    bottomBar = { CommentInputBar(landscapeId = null, postId = postId) }
-                ) { innerPadding ->
-                    Column(modifier = Modifier.padding(innerPadding).fillMaxSize()) {
-                        PostDetailContent(postId)
-                    }
-                }
+                PostDetailScreen(postId)
             }
         }
     }
 }
 
 @Composable
-fun PostDetailContent(postId: String) {
+fun PostDetailScreen(postId: String) {
+    val scope = rememberCoroutineScope()
+    var comments by remember { mutableStateOf<List<CommentResponse>>(emptyList()) }
+
+    suspend fun loadComments() {
+        try {
+            val res = NetworkClient.apiService.getComments(postId = postId)
+            if (res.success) {
+                comments = res.data?.content ?: emptyList()
+            }
+        } catch (e: Exception) {
+            Log.e("PostDetail", "Error loading comments: ${e.message}", e)
+        }
+    }
+
+    LaunchedEffect(postId) {
+        loadComments()
+    }
+
+    Scaffold(
+        bottomBar = {
+            CommentInputBar(
+                landscapeId = null,
+                postId = postId,
+                onCommentPosted = { scope.launch { loadComments() } }
+            )
+        }
+    ) { innerPadding ->
+        Column(modifier = Modifier.padding(innerPadding).fillMaxSize()) {
+            PostDetailContent(postId = postId, comments = comments)
+        }
+    }
+}
+
+@Composable
+fun PostDetailContent(postId: String, comments: List<CommentResponse>) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var post by remember { mutableStateOf<PostResponse?>(null) }
-    var comments by remember { mutableStateOf<List<CommentResponse>>(emptyList()) }
     var isLiked by remember { mutableStateOf(false) }
     var isFavorited by remember { mutableStateOf(false) }
 
@@ -59,10 +91,12 @@ fun PostDetailContent(postId: String) {
             if (res.success && res.data != null) {
                 post = res.data.toPostResponse()
             }
-            
-            // 评论接口不存在，暂时跳过
-            // val commRes = NetworkClient.apiService.getComments(postId = postId)
-            // if (commRes.success) comments = commRes.data?.content ?: emptyList()
+            if (UserSession.isLoggedIn()) {
+                InteractionHelper.loadPostStatus(postId)?.let { status ->
+                    isLiked = status.liked
+                    isFavorited = status.favorited
+                }
+            }
         } catch (e: Exception) {
             Toast.makeText(context, "加载失败", Toast.LENGTH_SHORT).show()
         }
@@ -87,37 +121,51 @@ fun PostDetailContent(postId: String) {
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 IconButton(onClick = {
+                    if (!UserSession.isLoggedIn()) {
+                        Toast.makeText(context, "请先登录", Toast.LENGTH_SHORT).show()
+                        return@IconButton
+                    }
                     scope.launch {
                         try {
-                            val res = if (isLiked) NetworkClient.apiService.deleteLike(postId)
-                                      else NetworkClient.apiService.addLike(LikeRequest("POST", postId = postId))
-                            if (res.success) {
-                                isLiked = !isLiked
+                            val liked = InteractionHelper.togglePostLike(postId)
+                            if (liked != null) {
+                                isLiked = liked
                                 Toast.makeText(context, if (isLiked) "点赞成功" else "取消点赞", Toast.LENGTH_SHORT).show()
+                            } else {
+                                Toast.makeText(context, "操作失败", Toast.LENGTH_SHORT).show()
                             }
-                        } catch (e: Exception) { }
+                        } catch (e: Exception) {
+                            Toast.makeText(context, "网络异常", Toast.LENGTH_SHORT).show()
+                        }
                     }
                 }) {
                     Icon(
-                        imageVector = if (isLiked) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                        imageVector = if (isLiked) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
                         contentDescription = "Like",
                         tint = if (isLiked) Color.Red else Color.White
                     )
                 }
                 IconButton(onClick = {
+                    if (!UserSession.isLoggedIn()) {
+                        Toast.makeText(context, "请先登录", Toast.LENGTH_SHORT).show()
+                        return@IconButton
+                    }
                     scope.launch {
                         try {
-                            val res = if (isFavorited) NetworkClient.apiService.deleteFavorite(postId)
-                                      else NetworkClient.apiService.addFavorite(FavoriteRequest("POST", postId = postId))
-                            if (res.success) {
-                                isFavorited = !isFavorited
+                            val favorited = InteractionHelper.togglePostFavorite(postId)
+                            if (favorited != null) {
+                                isFavorited = favorited
                                 Toast.makeText(context, if (isFavorited) "收藏成功" else "取消收藏", Toast.LENGTH_SHORT).show()
+                            } else {
+                                Toast.makeText(context, "操作失败", Toast.LENGTH_SHORT).show()
                             }
-                        } catch (e: Exception) { }
+                        } catch (e: Exception) {
+                            Toast.makeText(context, "网络异常", Toast.LENGTH_SHORT).show()
+                        }
                     }
                 }) {
                     Icon(
-                        imageVector = if (isFavorited) Icons.Default.Star else Icons.Default.FavoriteBorder,
+                        imageVector = if (isFavorited) Icons.Filled.Star else Icons.Outlined.Star,
                         contentDescription = "Favorite",
                         tint = if (isFavorited) Color(0xFFFFD700) else Color.White
                     )

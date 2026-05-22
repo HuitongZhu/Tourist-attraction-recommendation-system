@@ -1,5 +1,7 @@
 package com.example.travel
 
+import com.google.gson.annotations.SerializedName
+
 /**
  * 统一响应格式（适配后端返回的格式）
  */
@@ -43,6 +45,7 @@ data class PostBackendResponse(
     val userId: String,
     val title: String?,
     val landscapeId: String?,
+    val landscapeTitle: String? = null,
     val tag: String?,
     val content: String,
     val publishTime: String?,
@@ -126,19 +129,27 @@ data class UserSummary(
 )
 
 /**
- * 完整用户信息响应 (Admin/User Profile)
+ * 完整用户信息响应（与后端 /api/users/me 一致）
  */
 data class UserResponse(
-    val id: String,
-    val username: String,
-    val phone: String,
-    val realName: String?,
-    val idNumber: String?,
-    val gender: String?,
-    val birthday: String?,
-    val role: String,
-    val status: String,
-    val createdAt: String?
+    val userId: String?,
+    val userName: String?,
+    val userType: String?,
+    val phoneNumber: String?,
+    val realName: String? = null,
+    val idNumber: String? = null,
+    val gender: String? = null,
+    val birthday: String? = null
+)
+
+/** 管理员编辑用户请求 */
+data class AdminUpdateUserRequest(
+    val userName: String? = null,
+    val realName: String? = null,
+    val phoneNumber: String? = null,
+    val idNumber: String? = null,
+    val gender: String? = null,
+    val birthday: String? = null
 )
 
 /**
@@ -150,6 +161,7 @@ data class LandscapeBackendResponse(
     val title: String,
     val content: String,
     val address: String,
+    @SerializedName("tel")
     val landscapeTel: String?,
     val openingTime: String?,
     val level: String?,
@@ -183,19 +195,38 @@ data class LandscapeBackendResponse(
 /**
  * 景点响应（前端使用）
  */
+data class CommentReviewResponse(
+    val commentId: String,
+    val userId: String?,
+    val userName: String?,
+    val content: String,
+    val publishTime: String?,
+    val landscapeId: String?,
+    val postId: String?,
+    val targetType: String?,
+    val targetTitle: String?,
+    val auditState: String
+)
+
 data class LandscapeResponse(
+    @SerializedName("landscapeId")
     val id: String,
     val title: String,
     val content: String,
     val address: String,
+    val imagePath: String? = null,
     val latitude: Double?,
     val longitude: Double?,
+    @SerializedName("landscapeTel")
     val contactPhone: String?,
     val openingTime: String?,
     val level: String?,
+    @SerializedName("auditState")
     val status: String,
     val auditRemark: String?,
+    @SerializedName("publishTime")
     val publishedAt: String?,
+    @SerializedName("auditTime")
     val auditedAt: String?,
     val creator: UserSummary?
 )
@@ -209,6 +240,7 @@ data class LandscapeRequest(
     val address: String? = null,
     val latitude: Double? = null,
     val longitude: Double? = null,
+    val tel: String? = null,
     val contactPhone: String? = null,
     val openingTime: String? = null,
     val level: String? = null
@@ -243,19 +275,16 @@ data class PostRequest(
 )
 
 /**
- * 评论响应
+ * 评论响应（与后端 CommentResponse 字段一致）
  */
 data class CommentResponse(
-    val id: String,
+    val commentId: String,
+    val userId: String,
+    val userName: String?,
     val content: String,
-    val targetType: String,
-    val status: String,
-    val auditRemark: String?,
-    val publishedAt: String?,
-    val auditedAt: String?,
+    val publishTime: String?,
     val landscapeId: String?,
-    val postId: String?,
-    val author: UserSummary?
+    val postId: String?
 )
 
 /**
@@ -311,11 +340,21 @@ data class UpdateUserInfoRequest(
  * 互动响应
  */
 data class InteractionResponse(
-    val id: String,
-    val targetType: String,
+    val id: String?,
+    val targetType: String?,
     val landscapeId: String?,
     val postId: String?,
     val linkUrl: String?
+)
+
+/**
+ * 当前用户对景点/帖子的点赞收藏状态
+ */
+data class InteractionStatusResponse(
+    val liked: Boolean = false,
+    val favorited: Boolean = false,
+    val likeId: String? = null,
+    val favoriteId: String? = null
 )
 
 /**
@@ -341,4 +380,19 @@ data class GeocodeResponse(
 data class AuditRequest(
     val approved: Boolean,
     val remark: String? = null
+)
+
+/**
+ * 用户名检查响应
+ */
+data class UsernameCheckResponse(
+    val available: Boolean,
+    val message: String? = null
+)
+
+/**
+ * 更新用户状态请求
+ */
+data class UserStatusRequest(
+    val status: String // ACTIVE, INACTIVE, BANNED
 )

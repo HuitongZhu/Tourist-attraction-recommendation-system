@@ -25,18 +25,15 @@ enum class PageType {
 @Composable
 fun TopNavBar(
     currentPage: PageType,
-    onPageChange: (PageType) -> Unit,
-    userName: String = "杨"
+    onPageChange: (PageType) -> Unit
 ) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .background(Color(0xFF1A56DB))
             .padding(horizontal = 16.dp, vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        // 左侧：系统名称
         Text(
             text = "旅游书",
             color = Color.White,
@@ -45,7 +42,6 @@ fun TopNavBar(
             modifier = Modifier.padding(end = 16.dp)
         )
 
-        // 中间：导航项 (支持水平滚动)
         Row(
             modifier = Modifier
                 .weight(1f)
@@ -72,14 +68,5 @@ fun TopNavBar(
                 )
             }
         }
-
-        // 右侧：用户标识
-        Text(
-            text = userName,
-            color = Color.White,
-            fontSize = 16.sp,
-            fontWeight = FontWeight.Medium,
-            modifier = Modifier.padding(start = 16.dp)
-        )
     }
 }

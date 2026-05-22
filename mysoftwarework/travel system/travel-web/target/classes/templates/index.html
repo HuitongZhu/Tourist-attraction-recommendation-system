@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="zh-CN" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8"/>
+    <title>旅游景点推荐系统 - 首页</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/layui@2.8.18/dist/css/layui.css"/>
+    <link rel="stylesheet" th:href="@{/css/app.css}"/>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swiper@8/swiper-bundle.min.css"/>
+    <style>
+        .swiper-container { height: 420px; margin-top: 0; }
+        .swiper-slide img { width: 100%; height: 100%; object-fit: cover; }
+        .module-title { font-size: 20px; font-weight: bold; color: #333; margin: 28px 0 16px; padding-left: 8px; border-left: 4px solid #1a56db; }
+        .hot-landscape { display: flex; flex-wrap: wrap; gap: 24px; }
+        .landscape-card { width: calc((100% - 72px) / 4); background: #fff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 12px rgba(0,0,0,.05); }
+        .card-img { height: 160px; overflow: hidden; }
+        .card-img img { width: 100%; height: 100%; object-fit: cover; }
+        .card-content { padding: 14px; }
+        .card-title { font-size: 15px; font-weight: 600; color: #333; margin-bottom: 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .card-info { font-size: 12px; color: #6c757d; }
+        .post-list { background: #fff; border-radius: 8px; box-shadow: 0 2px 12px rgba(0,0,0,.05); }
+        .post-item { padding: 14px 18px; border-bottom: 1px solid #f0f0f0; display: flex; justify-content: space-between; gap: 16px; align-items: center; }
+        .post-item:last-child { border-bottom: none; }
+        .post-title { font-size: 15px; color: #333; text-decoration: none; }
+        .post-title:hover { color: #1a56db; }
+        .post-meta { font-size: 12px; color: #6c757d; white-space: nowrap; }
+    </style>
+</head>
+<body>
+<div th:replace="~{fragments :: navbar(${navKey})}"></div>
+<div class="swiper-container">
+    <div class="swiper-wrapper">
+        <div class="swiper-slide"><img src="https://picsum.photos/id/1036/1920/480" alt=""/></div>
+        <div class="swiper-slide"><img src="https://picsum.photos/id/1039/1920/480" alt=""/></div>
+        <div class="swiper-slide"><img src="https://picsum.photos/id/1043/1920/480" alt=""/></div>
+    </div>
+    <div class="swiper-button-prev"></div>
+    <div class="swiper-button-next"></div>
+</div>
+<div class="page-wrap">
+    <div th:if="${msg}" class="alert alert-info" th:text="${msg}"></div>
+    <h3 class="module-title">热门景点</h3>
+    <div class="hot-landscape">
+        <div class="landscape-card" th:each="l : ${landscapes}">
+            <div class="card-img">
+                <img th:if="${l.imagePath != null}" th:src="${l.imagePath}" th:alt="${l.title}"/>
+                <img th:unless="${l.imagePath != null}" th:src="@{'https://picsum.photos/seed/' + ${l.landscapeId} + '/400/240'}" th:alt="${l.title}"/>
+            </div>
+            <div class="card-content">
+                <a class="card-title" th:href="@{/landscapes/{id}(id=${l.landscapeId})}" th:text="${l.title}">标题</a>
+                <div class="card-info">
+                    <span th:text="${l.address}">地址</span>
+                    <span th:if="${l.level}" th:text="' · ' + ${l.level}"></span>
+                </div>
+            </div>
+        </div>
+    </div>
+    <h3 class="module-title">最新推荐帖</h3>
+    <div class="post-list">
+        <div class="post-item" th:each="p : ${posts}">
+            <div>
+                <a class="post-title" th:href="@{/posts/{id}(id=${p.recomId})}" th:text="${p.title != null ? p.title : '推荐帖'}">标题</a>
+                <div class="post-meta" th:text="${#temporals.format(p.publishTime, 'yyyy-MM-dd HH:mm')}">时间</div>
+            </div>
+            <div class="post-meta">攻略</div>
+        </div>
+    </div>
+</div>
+<div th:replace="~{fragments :: footer}"></div>
+<script src="https://cdn.jsdelivr.net/npm/swiper@8/swiper-bundle.min.js"></script>
+<script>
+    new Swiper('.swiper-container', {
+        loop: true,
+        autoplay: { delay: 3500, disableOnInteraction: false },
+        navigation: { nextEl: '.swiper-button-next', prevEl: '.swiper-button-prev' }
+    });
+</script>
+</body>
+</html>

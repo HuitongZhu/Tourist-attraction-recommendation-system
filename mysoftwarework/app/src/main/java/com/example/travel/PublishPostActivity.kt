@@ -7,14 +7,14 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -54,18 +54,45 @@ class PublishPostActivity : ComponentActivity() {
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PublishPostContent() {
     val context = LocalContext.current
     val activity = context as? ComponentActivity
 
     var title by remember { mutableStateOf("") }
-    var linkedScenic by remember { mutableStateOf("") }
+    var selectedLandscapeId by remember { mutableStateOf<String?>(null) }
+    var selectedLandscapeTitle by remember { mutableStateOf("") }
+    var landscapeMenuExpanded by remember { mutableStateOf(false) }
+    /** 与首页相同数据源：已审核通过的景点 */
+    var landscapeOptions by remember { mutableStateOf<List<LandscapeResponse>>(emptyList()) }
+    var landscapesLoading by remember { mutableStateOf(true) }
+
     var currentTag by remember { mutableStateOf("") }
-    val tags = remember { mutableStateListOf("攻略", "美食") }
+    val tags = remember { mutableStateListOf<String>() }
     var content by remember { mutableStateOf("") }
 
     val scrollState = rememberScrollState()
+
+    LaunchedEffect(Unit) {
+        landscapesLoading = true
+        try {
+            // 与首页 HomeActivity 使用同一接口，保证下拉与首页展示一致
+            val res = NetworkClient.apiService.getLandscapes(status = "审核通过", size = 200)
+            if (res.success && res.data != null) {
+                landscapeOptions = res.data
+            } else {
+                // 若新接口已部署，再尝试拉取全部已审核景点
+                val extra = NetworkClient.apiService.getApprovedLandscapes()
+                if (extra.success && extra.data != null) {
+                    landscapeOptions = extra.data.map { it.toLandscapeResponse() }
+                }
+            }
+        } catch (_: Exception) {
+        } finally {
+            landscapesLoading = false
+        }
+    }
 
     Column(
         modifier = Modifier
@@ -81,7 +108,7 @@ fun PublishPostContent() {
             modifier = Modifier.fillMaxWidth()
         ) {
             Text(
-                text = "提示：推荐帖需关联具体景点，发布后1-2个工作日审核，通过后在“推荐”板块展示",
+                text = "提示：推荐帖需关联已审核通过的景点，发布后等待管理员审核",
                 fontSize = 13.sp,
                 color = Color(0xFF8B8000),
                 modifier = Modifier.padding(12.dp)
@@ -90,7 +117,6 @@ fun PublishPostContent() {
 
         Spacer(modifier = Modifier.height(20.dp))
 
-        // 标题
         Text("推荐帖标题", fontSize = 15.sp, fontWeight = FontWeight.Medium, modifier = Modifier.padding(bottom = 8.dp))
         OutlinedTextField(
             value = title,
@@ -102,35 +128,66 @@ fun PublishPostContent() {
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // 关联景点
         Text("关联景点", fontSize = 15.sp, fontWeight = FontWeight.Medium, modifier = Modifier.padding(bottom = 8.dp))
-        OutlinedTextField(
-            value = linkedScenic,
-            onValueChange = { linkedScenic = it },
-            placeholder = { Text("请选择/输入关联景点（如：北京故宫）", fontSize = 14.sp) },
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(4.dp)
-        )
+        if (landscapesLoading) {
+            CircularProgressIndicator(modifier = Modifier.size(24.dp))
+        } else if (landscapeOptions.isEmpty()) {
+            Text("暂无景点，请先在首页确认有已审核通过的景点", fontSize = 13.sp, color = Color.Gray)
+        } else {
+            ExposedDropdownMenuBox(
+                expanded = landscapeMenuExpanded,
+                onExpandedChange = { landscapeMenuExpanded = it }
+            ) {
+                OutlinedTextField(
+                    value = selectedLandscapeTitle,
+                    onValueChange = {},
+                    readOnly = true,
+                    placeholder = { Text("请选择关联景点", fontSize = 14.sp) },
+                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = landscapeMenuExpanded) },
+                    modifier = Modifier.menuAnchor().fillMaxWidth(),
+                    shape = RoundedCornerShape(4.dp)
+                )
+                ExposedDropdownMenu(
+                    expanded = landscapeMenuExpanded,
+                    onDismissRequest = { landscapeMenuExpanded = false }
+                ) {
+                    landscapeOptions.forEach { landscape ->
+                        DropdownMenuItem(
+                            text = { Text(landscape.title) },
+                            onClick = {
+                                selectedLandscapeId = landscape.id
+                                selectedLandscapeTitle = landscape.title
+                                landscapeMenuExpanded = false
+                            }
+                        )
+                    }
+                }
+            }
+        }
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // 推荐标签
         Text("推荐标签", fontSize = 15.sp, fontWeight = FontWeight.Medium, modifier = Modifier.padding(bottom = 8.dp))
         Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             OutlinedTextField(
                 value = currentTag,
                 onValueChange = { currentTag = it },
-                placeholder = { Text("输入标签后点击添加", fontSize = 14.sp) },
+                placeholder = { Text("输入标签文字后点击添加", fontSize = 14.sp) },
                 modifier = Modifier.weight(1f),
-                shape = RoundedCornerShape(4.dp)
+                shape = RoundedCornerShape(4.dp),
+                singleLine = true
             )
             Spacer(modifier = Modifier.width(8.dp))
             Button(
                 onClick = {
-                    if (currentTag.isNotBlank()) {
-                        tags.add(currentTag)
-                        currentTag = ""
+                    val t = currentTag.trim()
+                    if (t.isEmpty()) return@Button
+                    if (tags.contains(t)) {
+                        Toast.makeText(context, "标签已存在", Toast.LENGTH_SHORT).show()
+                        return@Button
                     }
+                    tags.add(t)
+                    currentTag = ""
                 },
                 shape = RoundedCornerShape(4.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF673AB7)),
@@ -139,35 +196,26 @@ fun PublishPostContent() {
                 Text("添加")
             }
         }
-        
-        // 展示标签
-        Row(modifier = Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            tags.forEach { tag ->
-                Surface(
-                    color = Color(0xFFF0F0F0),
-                    shape = RoundedCornerShape(4.dp),
-                    modifier = Modifier.clickable { tags.remove(tag) }
-                ) {
-                    Text(tag, modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp), fontSize = 12.sp)
+
+        if (tags.isNotEmpty()) {
+            LazyRow(
+                modifier = Modifier.padding(top = 10.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                items(tags.toList(), key = { it }) { tag ->
+                    AssistChip(
+                        onClick = { tags.remove(tag) },
+                        label = { Text(tag, fontSize = 12.sp) },
+                        trailingIcon = {
+                            Icon(Icons.Default.Close, contentDescription = "删除", modifier = Modifier.size(14.dp))
+                        }
+                    )
                 }
             }
         }
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // 推荐图片
-        Text("推荐图片", fontSize = 15.sp, fontWeight = FontWeight.Medium, modifier = Modifier.padding(bottom = 8.dp))
-        Box(
-            modifier = Modifier.size(100.dp).background(Color(0xFFF5F5F5)).border(1.dp, Color(0xFFE0E0E0)),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(Icons.Default.Add, contentDescription = null, tint = Color.Gray, modifier = Modifier.size(32.dp))
-        }
-        Text("支持JPG、PNG格式，建议16:9", fontSize = 12.sp, color = Color.Gray, modifier = Modifier.padding(top = 4.dp))
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        // 推荐内容
         Text("推荐内容", fontSize = 15.sp, fontWeight = FontWeight.Medium, modifier = Modifier.padding(bottom = 8.dp))
         OutlinedTextField(
             value = content,
@@ -181,28 +229,42 @@ fun PublishPostContent() {
 
         Button(
             onClick = {
-                if (title.isEmpty() || content.isEmpty()) {
-                    Toast.makeText(context, "请填写必填项", Toast.LENGTH_SHORT).show()
+                if (title.isBlank() || content.isBlank()) {
+                    Toast.makeText(context, "请填写标题和推荐内容", Toast.LENGTH_SHORT).show()
+                    return@Button
+                }
+                if (selectedLandscapeId.isNullOrBlank()) {
+                    Toast.makeText(context, "请选择关联景点", Toast.LENGTH_SHORT).show()
+                    return@Button
+                }
+                if (!UserSession.isLoggedIn()) {
+                    Toast.makeText(context, "请先登录", Toast.LENGTH_SHORT).show()
                     return@Button
                 }
 
                 activity?.lifecycleScope?.launch {
                     try {
                         val request = PostRequest(
-                            title = title,
-                            content = content,
-                            tag = tags.joinToString(","),
-                            landscapeId = null // 实际应用中应关联具体ID
+                            title = title.trim(),
+                            content = content.trim(),
+                            landscapeId = selectedLandscapeId,
+                            tag = tags.joinToString(",").ifBlank { null }
                         )
-                        val response = NetworkClient.apiService.createPost(request)
+                        val response = NetworkClient.apiService.publishPost(request)
                         if (response.success) {
-                            Toast.makeText(context, "发布成功，等待审核", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(context, "发布成功，等待管理员审核", Toast.LENGTH_SHORT).show()
                             activity.finish()
                         } else {
-                            Toast.makeText(context, "失败: ${response.message}", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(context, response.message ?: "发布失败", Toast.LENGTH_SHORT).show()
                         }
+                    } catch (e: retrofit2.HttpException) {
+                        val msg = when (e.code()) {
+                            405, 404 -> "后端未更新：请 Rebuild 并重启 TravelWebApplication"
+                            else -> "请求失败 HTTP ${e.code()}"
+                        }
+                        Toast.makeText(context, msg, Toast.LENGTH_LONG).show()
                     } catch (e: Exception) {
-                        Toast.makeText(context, "网络错误", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, "网络错误: ${e.message}", Toast.LENGTH_SHORT).show()
                     }
                 }
             },

@@ -34,19 +34,14 @@ class HomeActivity : ComponentActivity() {
 
                 LaunchedEffect(Unit) {
                     try {
-                        val response = NetworkClient.apiService.getHomePage()
-                        if (response.isSuccessful) {
-                            val html = response.body()?.string()
-                            if (html != null) {
-                                scenicSpots = parseLandscapesFromHtml(html)
-                                if (scenicSpots.isEmpty()) {
-                                    Toast.makeText(this@HomeActivity, "解析数据失败", Toast.LENGTH_SHORT).show()
-                                }
-                            } else {
-                                Toast.makeText(this@HomeActivity, "响应体为空", Toast.LENGTH_SHORT).show()
+                        val response = NetworkClient.apiService.getLandscapes(status = "审核通过", size = 6)
+                        if (response.success && response.data != null) {
+                            scenicSpots = response.data
+                            if (scenicSpots.isEmpty()) {
+                                Toast.makeText(this@HomeActivity, "暂无景点数据", Toast.LENGTH_SHORT).show()
                             }
                         } else {
-                            Toast.makeText(this@HomeActivity, "请求失败: ${response.code()}", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(this@HomeActivity, response.message ?: "获取景点数据失败", Toast.LENGTH_SHORT).show()
                         }
                     } catch (e: Exception) {
                         Log.e("HomeActivity", "Network error: ${e.message}", e)

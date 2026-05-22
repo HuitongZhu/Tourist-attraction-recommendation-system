@@ -30,6 +30,10 @@ import kotlinx.coroutines.launch
 class LoginActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // 启动页为登录页，不自动沿用上次登录态
+        NetworkClient.userId = null
+        NetworkClient.userName = null
+        NetworkClient.userType = null
         enableEdgeToEdge()
         setContent {
             TravelTheme {
@@ -40,79 +44,68 @@ class LoginActivity : ComponentActivity() {
                             startActivity(Intent(this, RegisterActivity::class.java))
                         },
                         onForgotPasswordClick = {
-                            Toast.makeText(this, "功能暂未开放", Toast.LENGTH_SHORT).show()
+                            startActivity(Intent(this, ForgotPasswordActivity::class.java))
                         },
-                        onLoginClick = { account, password, isSmsMode, smsCode, showError ->
+                        onLoginClick = { account, password, isSmsMode, smsCode, isAdmin, showError ->
                             lifecycleScope.launch {
                                 try {
+                                    // 根据选择的身份设置 userType
+                                    val userType = if (isAdmin) "1" else "2" // 1 = 管理员, 2 = 普通用户
+                                    
                                     val response = if (isSmsMode) {
-                                        if (account.isEmpty() || smsCode.isEmpty()) {
-                                            showError("请输入手机号和验证码")
-                                            return@launch
-                                        }
-                                        NetworkClient.apiService.login(account = account, password = null, code = smsCode, loginType = "sms")
+                                        NetworkClient.apiService.login(account = account, password = null, code = smsCode, loginType = "sms", userType = userType)
                                     } else {
-                                        if (account.isEmpty() || password.isEmpty()) {
-                                            showError("请输入账号和密码")
-                                            return@launch
-                                        }
-                                        NetworkClient.apiService.login(account = account, password = password, code = null, loginType = "password")
+                                        NetworkClient.apiService.login(account = account, password = password, code = null, loginType = "password", userType = userType)
                                     }
 
                                     if (response.isSuccessful) {
                                         val body = response.body()?.string()
                                         
                                         if (body != null) {
-                                            // 解析 JSON 响应
-                                            try {
-                                                val jsonObject = org.json.JSONObject(body)
-                                                val success = jsonObject.getBoolean("success")
-                                                
-                                                if (success) {
-                                                    val data = jsonObject.getJSONObject("data")
-                                                    val userType = data.getString("userType")
-                                                    val userId = data.getString("userId")
-                                                    val userName = data.getString("userName")
-                                                    
-                                                    // 保存用户信息
-                                                    NetworkClient.userToken = userId
-                                                    NetworkClient.userId = userId
-                                                    NetworkClient.userName = userName
-                                                    NetworkClient.userType = userType
-                                                    
-                                                    // 根据用户类型跳转
-                                                    if (userType == "1") {
-                                                        Toast.makeText(this@LoginActivity, "管理员登录成功", Toast.LENGTH_SHORT).show()
-                                                        startActivity(Intent(this@LoginActivity, AdminActivity::class.java))
-                                                    } else {
-                                                        Toast.makeText(this@LoginActivity, "登录成功", Toast.LENGTH_SHORT).show()
-                                                        startActivity(Intent(this@LoginActivity, HomeActivity::class.java))
-                                                    }
-                                                    finish()
+                                            // 检查是否包含成功响应
+                                            if (body.contains("\"code\":200")) {
+                                                // 提取用户信息
+                                                val userId = if (body.contains("\"userId\":\"")) {
+                                                    body.substringAfter("\"userId\":\"").substringBefore("\"")
                                                 } else {
-                                                    val message = jsonObject.optString("message", "登录失败")
-                                                    showError(message)
+                                                    ""
                                                 }
-                                            } catch (e: Exception) {
-                                                Log.e("LoginActivity", "JSON parse error: ${e.message}", e)
-                                                showError("登录失败")
+                                                val userType = body.substringAfter("\"userType\":\"").substringBefore("\"")
+                                                val userName = if (body.contains("\"userName\":\"")) {
+                                                    body.substringAfter("\"userName\":\"").substringBefore("\"")
+                                                } else {
+                                                    ""
+                                                }
+                                                
+                                                // 保存用户信息（持久化，下次启动仍可用）
+                                                UserSession.save(this@LoginActivity, userId, userName, userType)
+                                                
+                                                if (userType == "1") {
+                                                    // 管理员
+                                                    Toast.makeText(this@LoginActivity, "管理员登录成功", Toast.LENGTH_SHORT).show()
+                                                    startActivity(Intent(this@LoginActivity, AdminActivity::class.java))
+                                                } else {
+                                                    // 普通用户
+                                                    Toast.makeText(this@LoginActivity, "登录成功", Toast.LENGTH_SHORT).show()
+                                                    startActivity(Intent(this@LoginActivity, HomeActivity::class.java))
+                                                }
+                                                finish()
+                                            } else {
+                                                // 提取错误消息
+                                                val message = if (body.contains("\"message\":\"")) {
+                                                    val start = body.indexOf("\"message\":\"") + 11
+                                                    val end = body.indexOf("\"", start)
+                                                    if (start < end) body.substring(start, end) else "登录失败"
+                                                } else {
+                                                    "登录失败"
+                                                }
+                                                showError(message)
                                             }
                                         } else {
                                             showError("登录失败")
                                         }
                                     } else {
-                                        val errorBody = response.errorBody()?.string()
-                                        val message = try {
-                                            if (errorBody != null) {
-                                                val jsonObject = org.json.JSONObject(errorBody)
-                                                jsonObject.optString("message", "账号或密码错误")
-                                            } else {
-                                                "账号或密码错误"
-                                            }
-                                        } catch (e: Exception) {
-                                            "账号或密码错误"
-                                        }
-                                        showError(message)
+                                        showError("账号或密码错误")
                                     }
                                 } catch (e: Exception) {
                                     Log.e("LoginActivity", "Network error: ${e.message}", e)
@@ -163,13 +156,14 @@ fun LoginScreen(
     modifier: Modifier = Modifier,
     onRegisterClick: () -> Unit,
     onForgotPasswordClick: () -> Unit,
-    onLoginClick: (String, String, Boolean, String, (String) -> Unit) -> Unit,
+    onLoginClick: (String, String, Boolean, String, Boolean, (String) -> Unit) -> Unit,
     onSendSmsClick: (String, (String) -> Unit) -> Unit
 ) {
     var account by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var smsCode by remember { mutableStateOf("") }
     var isSmsMode by remember { mutableStateOf(false) }
+    var isAdmin by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf("") }
 
     Column(
@@ -190,6 +184,20 @@ fun LoginScreen(
 
         Spacer(modifier = Modifier.height(30.dp))
 
+        // 登录身份选择
+        Row(
+            modifier = Modifier.fillMaxWidth(0.8f),
+            horizontalArrangement = Arrangement.Center,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            CustomRadioButton(selected = !isAdmin, label = "用户登录", onClick = { isAdmin = false })
+            Spacer(modifier = Modifier.width(30.dp))
+            CustomRadioButton(selected = isAdmin, label = "管理员登录", onClick = { isAdmin = true })
+        }
+
+        Spacer(modifier = Modifier.height(20.dp))
+
+        // 登录方式选择
         Row(
             modifier = Modifier.fillMaxWidth(0.8f),
             horizontalArrangement = Arrangement.Center,
@@ -266,7 +274,39 @@ fun LoginScreen(
         Button(
             onClick = { 
                 errorMessage = ""
-                onLoginClick(account, password, isSmsMode, smsCode) { msg -> 
+                
+                // 1. 检查账号是否为空
+                if (account.isEmpty()) {
+                    errorMessage = "请输入账号"
+                    return@Button
+                }
+                
+                // 2. 根据登录模式进行验证
+                if (isSmsMode) {
+                    // 短信登录模式
+                    if (smsCode.isEmpty()) {
+                        errorMessage = "请输入验证码"
+                        return@Button
+                    }
+                    // 检查手机号格式（11位数字）
+                    if (!account.matches(Regex("^\\d{11}$"))) {
+                        errorMessage = "请输入正确的11位手机号"
+                        return@Button
+                    }
+                } else {
+                    // 密码登录模式
+                    if (password.isEmpty()) {
+                        errorMessage = "请输入密码"
+                        return@Button
+                    }
+                    // 检查密码长度（6位及以上）
+                    if (password.length < 6) {
+                        errorMessage = "密码长度至少需要6位"
+                        return@Button
+                    }
+                }
+                
+                onLoginClick(account, password, isSmsMode, smsCode, isAdmin) { msg -> 
                     errorMessage = msg 
                 } 
             },

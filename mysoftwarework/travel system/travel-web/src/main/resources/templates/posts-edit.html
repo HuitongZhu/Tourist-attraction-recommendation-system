@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="zh-CN" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8"/>
+    <title>编辑推荐帖</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/layui@2.8.18/dist/css/layui.css"/>
+    <style>
+        .top-nav { background: #fff; box-shadow: 0 2px 8px rgba(0,0,0,.06); position: sticky; top: 0; z-index: 100; }
+        .nav-container { max-width: 1200px; margin: 0 auto; display: flex; justify-content: space-between; align-items: center; height: 60px; padding: 0 20px; }
+        .logo-text { font-size: 20px; font-weight: bold; color: #1a56db; }
+        .nav-menu { display: flex; gap: 32px; }
+        .nav-menu a { color: #333; text-decoration: none; font-size: 14px; transition: color .2s; }
+        .nav-menu a:hover { color: #1a56db; }
+        .nav-menu a.active { color: #1a56db; font-weight: 500; }
+        .nav-user { display: flex; align-items: center; gap: 16px; }
+        .publish-btn { background: #1a56db; color: #fff; border: none; padding: 8px 20px; border-radius: 4px; cursor: pointer; font-size: 14px; }
+        .publish-btn:hover { background: #154bc8; }
+        .user-avatar { width: 36px; height: 36px; border-radius: 50%; background: #1a56db; color: #fff; display: flex; align-items: center; justify-content: center; font-size: 14px; }
+        .page-wrap { max-width: 800px; margin: 40px auto; padding: 0 20px; }
+        .form-container { background: #fff; border-radius: 8px; box-shadow: 0 2px 12px rgba(0,0,0,.05); padding: 30px; }
+        .form-title { font-size: 18px; font-weight: 600; color: #333; margin-bottom: 24px; padding-bottom: 16px; border-bottom: 1px solid #f0f0f0; }
+        .form-group { margin-bottom: 20px; }
+        .form-label { display: block; font-size: 14px; color: #333; margin-bottom: 8px; }
+        .form-input { width: 100%; padding: 10px 12px; border: 1px solid #e0e0e0; border-radius: 4px; font-size: 14px; box-sizing: border-box; }
+        .form-textarea { width: 100%; padding: 10px 12px; border: 1px solid #e0e0e0; border-radius: 4px; font-size: 14px; box-sizing: border-box; min-height: 200px; resize: vertical; }
+        .form-actions { display: flex; gap: 16px; justify-content: flex-end; margin-top: 24px; }
+        .btn-primary { background: #1a56db; color: #fff; border: none; padding: 10px 30px; border-radius: 4px; cursor: pointer; font-size: 14px; }
+        .btn-primary:hover { background: #154bc8; }
+        .btn-secondary { background: #f5f5f5; color: #666; border: none; padding: 10px 30px; border-radius: 4px; cursor: pointer; font-size: 14px; }
+        .btn-secondary:hover { background: #e8e8e8; }
+        .error-message { color: #dc3545; font-size: 12px; margin-top: 4px; }
+        .audit-hint { background: #fff3cd; color: #856404; padding: 10px 16px; border-radius: 4px; margin-bottom: 20px; font-size: 14px; }
+    </style>
+</head>
+<body>
+    <div class="top-nav">
+        <div class="nav-container">
+            <div class="nav-logo">
+                <span class="logo-text">旅游景点推荐系统</span>
+            </div>
+            <div class="nav-menu">
+                <a href="/">首页</a>
+                <a href="/landscapes">景点信息</a>
+                <a href="/posts">推荐帖</a>
+                <a href="/my/collects">我的收藏</a>
+                <a href="/user/profile">个人中心</a>
+            </div>
+            <div class="nav-user">
+                <button class="publish-btn" onclick="window.location.href='/landscapes/new'">发布景点</button>
+                <div class="user-avatar" th:text="${loginUserName != null ? loginUserName.charAt(0) : '用'}"></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="page-wrap">
+        <div class="form-container">
+            <div class="form-title">编辑推荐帖</div>
+            
+            <div class="audit-hint">
+                <strong>提示：</strong>修改后将重新进入审核状态，请耐心等待审核。
+            </div>
+            
+            <form th:action="@{/posts/edit/{id}(id=${post.recomId})}" method="post">
+                <div class="form-group">
+                    <label class="form-label">标题</label>
+                    <input type="text" class="form-input" name="title" th:value="${post.title}" placeholder="输入推荐帖标题" required/>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">关联景点</label>
+                    <select class="form-input" name="landscapeId">
+                        <option value="">请选择关联景点（可选）</option>
+                        <option th:each="landscape : ${landscapes}" th:value="${landscape.landscapeId}" th:selected="${landscape.landscapeId == post.landscapeId}" th:text="${landscape.title}"></option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">标签</label>
+                    <input type="text" class="form-input" name="tag" th:value="${post.tag}" placeholder="输入推荐帖标签，多个标签用逗号分隔（如：美食,攻略,游记）"/>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">内容</label>
+                    <textarea class="form-textarea" name="content" th:text="${post.content}" placeholder="分享你的旅游推荐和体验..." required></textarea>
+                </div>
+                
+                <div class="form-actions">
+                    <button type="button" class="btn-secondary" onclick="window.location.href='/post/my'">取消</button>
+                    <button type="submit" class="btn-primary">保存修改</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</body>
+</html>

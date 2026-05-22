@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+<header th:fragment="navbar (navKey)" class="top-nav">
+    <div class="nav-container">
+        <div class="nav-logo">
+            <a th:href="@{/}" style="text-decoration:none;color:inherit"><span class="logo-text">旅游景点推荐系统</span></a>
+        </div>
+        <div class="nav-menu">
+            <a th:href="@{/}" th:classappend="${navKey == 'home'} ? 'active'">首页</a>
+            <a th:href="@{/landscapes}" th:classappend="${navKey == 'landscapes'} ? 'active'">景点信息</a>
+            <a th:href="@{/posts}" th:classappend="${navKey == 'posts'} ? 'active'">推荐帖</a>
+            <a th:href="@{/my/collects}" th:classappend="${navKey == 'my'} ? 'active'">我的</a>
+            <a th:href="@{/user/profile}" th:if="${loginUserId != null}" th:classappend="${navKey == 'user'} ? 'active'">个人中心</a>
+            <a th:href="@{/login(next='/user/profile')}" th:if="${loginUserId == null}" th:classappend="${navKey == 'user'} ? 'active'">个人中心</a>
+        </div>
+        <div class="nav-user">
+            <a th:if="${loginUserId != null}" th:href="@{/landscapes/new}" class="nav-link-btn">发布景点</a>
+            <a th:if="${loginUserId == null}" th:href="@{/login(next='/landscapes/new')}" class="nav-link-btn">发布景点</a>
+            <a th:if="${loginUserId != null}" th:href="@{/posts/new}" class="nav-link-btn">发布推荐帖</a>
+            <a th:if="${loginUserId == null}" th:href="@{/login(next='/posts/new')}" class="nav-link-btn">发布推荐帖</a>
+            <a th:if="${loginUserId != null}" th:href="@{/logout}" class="nav-link-muted">退出</a>
+            <a th:if="${loginUserId == null}" th:href="@{/login}" class="nav-link-btn primary">登录</a>
+            <a th:if="${loginUserId == null}" th:href="@{/register}" class="nav-link-btn outline">注册</a>
+            <span th:if="${loginUserId != null}" class="user-chip" th:text="${loginUserName}">用户</span>
+        </div>
+    </div>
+</header>
+
+<footer th:fragment="footer" class="footer">
+    <div class="copyright">©2026 旅游景点推荐系统</div>
+</footer>
+</body>
+</html>

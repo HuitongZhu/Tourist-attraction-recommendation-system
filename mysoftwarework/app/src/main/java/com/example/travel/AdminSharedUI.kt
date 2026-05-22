@@ -121,6 +121,16 @@ fun AdminSidebar(selectedModule: String, onModuleSelect: ((String) -> Unit)? = n
                 }
             }
         )
+
+        AdminSidebarItem(
+            text = "审核评论",
+            isSelected = selectedModule == "COMMENT",
+            onClick = {
+                if (selectedModule != "COMMENT") {
+                    context.startActivity(Intent(context, CommentReviewActivity::class.java))
+                }
+            }
+        )
     }
 }
 
@@ -134,6 +144,16 @@ fun AdminSidebarItem(text: String, isSelected: Boolean, onClick: () -> Unit) {
         lineHeight = 22.sp,
         modifier = Modifier.clickable { onClick() }
     )
+}
+
+/** 审核页筛选：全部 / 通过 / 未审核 */
+@Composable
+fun ReviewFilterRow(selectedFilter: String, onFilterChange: (String) -> Unit) {
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        StatusChip("全部", selectedFilter == AdminReviewFilter.ALL) { onFilterChange(AdminReviewFilter.ALL) }
+        StatusChip("通过", selectedFilter == AdminReviewFilter.APPROVED) { onFilterChange(AdminReviewFilter.APPROVED) }
+        StatusChip("未审核", selectedFilter == AdminReviewFilter.PENDING) { onFilterChange(AdminReviewFilter.PENDING) }
+    }
 }
 
 /**

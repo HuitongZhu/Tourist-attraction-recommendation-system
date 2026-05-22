@@ -9,6 +9,7 @@
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
     
     <application
+        android:name=".TravelApplication"
         android:allowBackup="true"
         android:fullBackupContent="@xml/backup_rules"
         android:icon="@mipmap/ic_launcher"
@@ -118,6 +119,31 @@
         <!-- 19. 推荐帖详情页 -->
         <activity
             android:name=".PostDetailActivity"
+            android:exported="false" />
+
+        <!-- 20. 我的点赞/收藏列表 -->
+        <activity
+            android:name=".MyInteractionListActivity"
+            android:exported="false" />
+
+        <!-- 21. 我的景点信息 -->
+        <activity
+            android:name=".MyScenicManagementActivity"
+            android:exported="false" />
+
+        <!-- 22. 编辑景点 -->
+        <activity
+            android:name=".EditScenicActivity"
+            android:exported="false" />
+
+        <!-- 23. 我的推荐帖 -->
+        <activity
+            android:name=".MyPostsActivity"
+            android:exported="false" />
+
+        <!-- 24. 审核评论 -->
+        <activity
+            android:name=".CommentReviewActivity"
             android:exported="false" />
             
     </application>
