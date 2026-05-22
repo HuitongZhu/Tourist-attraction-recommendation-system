@@ -1,20 +1,13 @@
 package com.travel.travelweb.service;
 
-import java.util.Optional;
-
+import com.travel.travelweb.entity.OrdinaryUser;
+import com.travel.travelweb.entity.SysUser;
+import com.travel.travelweb.repo.*;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.travel.travelweb.entity.OrdinaryUser;
-import com.travel.travelweb.entity.SysUser;
-import com.travel.travelweb.repo.LandCollectRepository;
-import com.travel.travelweb.repo.LandCommentRepository;
-import com.travel.travelweb.repo.LandLikeRepository;
-import com.travel.travelweb.repo.LandscapeRepository;
-import com.travel.travelweb.repo.OrdinaryUserRepository;
-import com.travel.travelweb.repo.PostCommentRepository;
-import com.travel.travelweb.repo.RecommendationPostRepository;
-import com.travel.travelweb.repo.SysUserRepository;
+import java.util.Optional;
 
 @Service
 public class UserProfileService {
@@ -33,6 +26,7 @@ public class UserProfileService {
     private final LandscapeRepository landscapeRepository;
     private final PostCommentRepository postCommentRepository;
     private final RecommendationPostRepository recommendationPostRepository;
+    private final PasswordEncoder passwordEncoder;
 
     public UserProfileService(SysUserRepository sysUserRepository, 
                              OrdinaryUserRepository ordinaryUserRepository,
@@ -41,7 +35,8 @@ public class UserProfileService {
                              LandLikeRepository landLikeRepository,
                              LandscapeRepository landscapeRepository,
                              PostCommentRepository postCommentRepository,
-                             RecommendationPostRepository recommendationPostRepository) {
+                             RecommendationPostRepository recommendationPostRepository,
+                             PasswordEncoder passwordEncoder) {
         this.sysUserRepository = sysUserRepository;
         this.ordinaryUserRepository = ordinaryUserRepository;
         this.landCollectRepository = landCollectRepository;
@@ -50,6 +45,7 @@ public class UserProfileService {
         this.landscapeRepository = landscapeRepository;
         this.postCommentRepository = postCommentRepository;
         this.recommendationPostRepository = recommendationPostRepository;
+        this.passwordEncoder = passwordEncoder;
     }
 
     public record Profile(
@@ -101,13 +97,16 @@ public class UserProfileService {
     @Transactional
     public void changePassword(String userId, String oldPwd, String newPwd) {
         SysUser u = sysUserRepository.findById(userId).orElseThrow();
-        if (!oldPwd.equals(u.getUserPassword())) {
+        if (!passwordEncoder.matches(oldPwd, u.getUserPassword())) {
             throw new IllegalArgumentException("原密码不正确");
         }
         if (newPwd == null || newPwd.length() < 6 || newPwd.length() > 30) {
             throw new IllegalArgumentException("新密码长度应为6-30位");
         }
-        u.setUserPassword(newPwd);
+        if (passwordEncoder.matches(newPwd, u.getUserPassword())) {
+            throw new IllegalArgumentException("新密码不能与旧密码相同，请重新设置新密码");
+        }
+        u.setUserPassword(passwordEncoder.encode(newPwd));
         sysUserRepository.save(u);
     }
 
@@ -123,18 +122,22 @@ public class UserProfileService {
             throw new IllegalArgumentException("新密码长度应为6-30位");
         }
 
+        SysUser u = sysUserRepository.findById(userId).orElseThrow();
+        if (passwordEncoder.matches(newPwd.trim(), u.getUserPassword())) {
+            throw new IllegalArgumentException("新密码不能与旧密码相同，请重新设置新密码");
+        }
+
         if ("password".equals(verifyType)) {
-            SysUser u = sysUserRepository.findById(userId).orElseThrow();
             System.out.println("数据库密码: [" + u.getUserPassword() + "]");
             if (verifyValue == null || verifyValue.trim().isEmpty()) {
                 System.out.println("验证值不能为空");
                 throw new IllegalArgumentException("请输入原密码");
             }
-            if (!verifyValue.trim().equals(u.getUserPassword())) {
+            if (!passwordEncoder.matches(verifyValue.trim(), u.getUserPassword())) {
                 System.out.println("密码不匹配，输入值和数据库值不同");
                 throw new IllegalArgumentException("原密码不正确");
             }
-            u.setUserPassword(newPwd.trim());
+            u.setUserPassword(passwordEncoder.encode(newPwd.trim()));
             sysUserRepository.save(u);
             System.out.println("密码验证通过，修改成功");
         } else if ("sms".equals(verifyType)) {
@@ -170,8 +173,7 @@ public class UserProfileService {
             
             passwordCodeCache.remove(phone);
             
-            SysUser u = sysUserRepository.findById(userId).orElseThrow();
-            u.setUserPassword(newPwd.trim());
+            u.setUserPassword(passwordEncoder.encode(newPwd.trim()));
             sysUserRepository.save(u);
             System.out.println("验证码验证通过，修改成功");
         } else {
@@ -267,7 +269,7 @@ public class UserProfileService {
         
         if ("password".equals(type)) {
             SysUser u = sysUserRepository.findById(userId).orElse(null);
-            return u != null && value.equals(u.getUserPassword());
+            return u != null && passwordEncoder.matches(value, u.getUserPassword());
         } else if ("sms".equals(type)) {
             OrdinaryUser ou = ordinaryUserRepository.findById(userId).orElse(null);
             if (ou == null || ou.getPhoneNumber() == null) {

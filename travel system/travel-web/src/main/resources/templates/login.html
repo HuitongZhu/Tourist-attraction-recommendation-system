@@ -170,42 +170,41 @@
         function updateUIForUserType() {
             var isAdmin = userType1.checked;
             
+            loginTabs.style.display = 'flex';
+            switchTip.style.display = 'inline';
+            
             if (isAdmin) {
-                loginTabs.style.display = 'none';
-                switchTip.style.display = 'none';
                 forgotPassword.style.display = 'none';
+            } else {
+                forgotPassword.style.display = 'inline';
+            }
+            
+            if (loginType.value === 'password') {
                 passwordRow.style.display = 'block';
                 codeRow.style.display = 'none';
-                loginType.value = 'password';
-                accountLabel.textContent = '账号';
-                accountInput.placeholder = '请输入账号';
-                accountInput.required = true;
-                document.querySelector('input[name="password"]').required = true;
-                document.querySelector('input[name="code"]').required = false;
-            } else {
-                loginTabs.style.display = 'flex';
-                switchTip.style.display = 'inline';
-                forgotPassword.style.display = 'inline';
-                if (loginType.value === 'password') {
-                    passwordRow.style.display = 'block';
-                    codeRow.style.display = 'none';
+                if (isAdmin) {
+                    accountLabel.textContent = '账号';
+                    accountInput.placeholder = '请输入账号';
+                } else {
                     accountLabel.textContent = '账号/手机号';
                     accountInput.placeholder = '请输入账号/手机号';
-                    document.querySelector('input[name="password"]').required = true;
-                    document.querySelector('input[name="code"]').required = false;
-                    tabPassword.classList.add('active');
-                    tabSms.classList.remove('active');
-                } else {
-                    passwordRow.style.display = 'none';
-                    codeRow.style.display = 'block';
-                    accountLabel.textContent = '手机号';
-                    accountInput.placeholder = '请输入手机号';
-                    document.querySelector('input[name="password"]').required = false;
-                    document.querySelector('input[name="code"]').required = true;
-                    tabSms.classList.add('active');
-                    tabPassword.classList.remove('active');
                 }
+                document.querySelector('input[name="password"]').required = true;
+                document.querySelector('input[name="code"]').required = false;
+                tabPassword.classList.add('active');
+                tabSms.classList.remove('active');
+            } else {
+                passwordRow.style.display = 'none';
+                codeRow.style.display = 'block';
+                accountLabel.textContent = '手机号';
+                accountInput.placeholder = '请输入手机号';
+                document.querySelector('input[name="password"]').required = false;
+                document.querySelector('input[name="code"]').required = true;
+                tabSms.classList.add('active');
+                tabPassword.classList.remove('active');
             }
+            
+            accountInput.required = true;
         }
         
         userType1.addEventListener('change', updateUIForUserType);
@@ -254,7 +253,7 @@
                 return;
             }
             
-            if (!/^1[3-9]\d{9}$/.test(phone)) {
+            if (!/^1[3-9]\d{9,10}$/.test(phone)) {
                 alert('请输入正确的手机号格式');
                 return;
             }

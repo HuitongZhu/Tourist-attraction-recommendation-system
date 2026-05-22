@@ -47,4 +47,30 @@ public interface LandscapeRepository extends JpaRepository<Landscape, String> {
     List<Landscape> findByUserId(@Param("userId") String userId);
 
     void deleteByUserId(String userId);
+    
+    @Query("""
+            SELECT COUNT(l) FROM Landscape l
+            WHERE l.title = :title
+            AND l.userId = :userId
+            """)
+    int countByTitleAndUserId(@Param("title") String title, @Param("userId") String userId);
+    
+    @Query("""
+            SELECT COUNT(l) FROM Landscape l
+            WHERE l.title = :title
+            """)
+    int countByTitle(@Param("title") String title);
+    
+    @Query("""
+            SELECT COUNT(l) FROM Landscape l
+            WHERE l.address LIKE CONCAT('%', :address, '%') OR :address LIKE CONCAT('%', l.address, '%')
+            """)
+    int countByAddressContaining(@Param("address") String address);
+    
+    @Query("""
+            SELECT COUNT(l) FROM Landscape l
+            WHERE l.address LIKE CONCAT('%', :address, '%') OR :address LIKE CONCAT('%', l.address, '%')
+            AND l.userId = :userId
+            """)
+    int countByAddressContainingAndUserId(@Param("address") String address, @Param("userId") String userId);
 }

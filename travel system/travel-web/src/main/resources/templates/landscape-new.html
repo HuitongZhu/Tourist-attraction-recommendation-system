@@ -11,6 +11,7 @@
     <div class="card" style="max-width:900px;margin:20px auto">
         <h2 style="margin-top:0;border-left:4px solid #1a56db;padding-left:10px">发布景点信息</h2>
         <p class="muted" style="background:#fff3cd;padding:10px;border-radius:6px">提交后状态为「待审核」，管理员审核通过后对外展示。</p>
+        <div th:if="${msg}" th:class="${msg.startsWith('提交成功') ? 'alert alert-info' : 'alert alert-error'}" th:text="${msg}"></div>
         <form th:action="@{/landscapes/new}" method="post" enctype="multipart/form-data" style="margin-top:20px">
             <div class="form-row">
                 <label>景点图片</label>

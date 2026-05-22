@@ -151,11 +151,48 @@ public class LandscapeService {
     public String createLandscape(String userId, String title, String content, String address,
                                   Double latitude, Double longitude, String tel, String openingTime, String level,
                                   MultipartFile image) throws IOException {
+        // 验证标题
+        if (title == null || title.isBlank()) {
+            throw new IllegalArgumentException("景点标题不能为空");
+        }
+        
+        // 检查用户是否已发布过同名景点（包括审核中和已通过）
+        int userTitleCount = landscapeRepository.countByTitleAndUserId(title.trim(), userId);
+        if (userTitleCount > 0) {
+            throw new IllegalArgumentException("您已发布过同名景点");
+        }
+        
+        // 检查系统中是否已存在同名景点（防止重复）
+        int totalTitleCount = landscapeRepository.countByTitle(title.trim());
+        if (totalTitleCount > 0) {
+            throw new IllegalArgumentException("该景点已存在");
+        }
+        
+        // 检查用户是否已发布过相同地址的景点
+        if (address != null && !address.isBlank()) {
+            int userAddressCount = landscapeRepository.countByAddressContainingAndUserId(address.trim(), userId);
+            if (userAddressCount > 0) {
+                throw new IllegalArgumentException("您已发布过该地址的景点");
+            }
+            
+            // 检查系统中是否已存在相同地址的景点
+            int totalAddressCount = landscapeRepository.countByAddressContaining(address.trim());
+            if (totalAddressCount > 0) {
+                throw new IllegalArgumentException("该地址的景点信息已存在");
+            }
+        }
+        
+        // 验证内容长度，避免超过数据库字段限制
+        String trimmedContent = content;
+        if (content != null && content.length() > 60000) {
+            trimmedContent = content.substring(0, 60000);
+        }
+        
         Landscape l = new Landscape();
         l.setLandscapeId(IdGenerator.next("LS"));
         l.setUserId(userId);
-        l.setTitle(title);
-        l.setContent(content);
+        l.setTitle(title.trim());
+        l.setContent(trimmedContent);
         l.setAddress(address);
         l.setLatitude(latitude);
         l.setLongitude(longitude);
@@ -211,7 +248,9 @@ public class LandscapeService {
             l.setTitle(title.trim());
         }
         if (content != null && !content.isBlank()) {
-            l.setContent(content.trim());
+            // 验证内容长度
+            String trimmedContent = content.length() > 60000 ? content.substring(0, 60000) : content;
+            l.setContent(trimmedContent.trim());
         }
         if (address != null && !address.isBlank()) {
             l.setAddress(address.trim());

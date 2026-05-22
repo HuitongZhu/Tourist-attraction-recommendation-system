@@ -1,10 +1,13 @@
 package com.travel.travelweb.service;
 
+import com.travel.travelweb.entity.Administrator;
 import com.travel.travelweb.entity.OrdinaryUser;
 import com.travel.travelweb.entity.SysUser;
+import com.travel.travelweb.repo.AdministratorRepository;
 import com.travel.travelweb.repo.OrdinaryUserRepository;
 import com.travel.travelweb.repo.SysUserRepository;
 import com.travel.travelweb.util.IdGenerator;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -25,33 +28,80 @@ public class AuthService {
 
     private final SysUserRepository userRepository;
     private final OrdinaryUserRepository ordinaryUserRepository;
+    private final AdministratorRepository administratorRepository;
+    private final PasswordEncoder passwordEncoder;
     
     private final Map<String, CodeInfo> codeCache = new ConcurrentHashMap<>();
 
-    public AuthService(SysUserRepository userRepository, OrdinaryUserRepository ordinaryUserRepository) {
+    public AuthService(SysUserRepository userRepository, OrdinaryUserRepository ordinaryUserRepository, AdministratorRepository administratorRepository, PasswordEncoder passwordEncoder) {
         this.userRepository = userRepository;
         this.ordinaryUserRepository = ordinaryUserRepository;
+        this.administratorRepository = administratorRepository;
+        this.passwordEncoder = passwordEncoder;
     }
 
-    public Optional<SysUser> login(String account, String password, String userType) {
+    public LoginResult login(String account, String password, String userType) {
         if (account == null || account.isBlank() || password == null) {
-            return Optional.empty();
+            return LoginResult.accountNotFound("账号或密码不能为空");
         }
         String a = account.trim();
         Optional<SysUser> u = userRepository.findByUserNameAndUserType(a, userType);
         if (u.isEmpty()) {
             u = userRepository.findByUserIdAndUserType(a, userType);
         }
-        if (u.isEmpty() && USER_TYPE_ORDINARY.equals(userType)) {
-            Optional<OrdinaryUser> ou = ordinaryUserRepository.findByPhoneNumber(a);
-            if (ou.isPresent()) {
-                u = userRepository.findById(ou.get().getUserId());
+        if (u.isEmpty()) {
+            if (USER_TYPE_ORDINARY.equals(userType)) {
+                // 普通用户登录：先检查是否在管理员表中存在
+                Optional<Administrator> adminByPhone = administratorRepository.findByPhoneNumber(a);
+                if (adminByPhone.isPresent()) {
+                    return LoginResult.accountNotFound("所选身份与账号不匹配");
+                }
+                // 查找用户名是否存在于管理员中
+                Optional<SysUser> sysUserByName = userRepository.findByUserName(a);
+                if (sysUserByName.isPresent() && USER_TYPE_ADMIN.equals(sysUserByName.get().getUserType())) {
+                    return LoginResult.accountNotFound("所选身份与账号不匹配");
+                }
+                // 查找普通用户
+                Optional<OrdinaryUser> ou = ordinaryUserRepository.findByPhoneNumber(a);
+                if (ou.isPresent()) {
+                    u = userRepository.findById(ou.get().getUserId());
+                }
+            } else if (USER_TYPE_ADMIN.equals(userType)) {
+                Optional<Administrator> admin = administratorRepository.findByPhoneNumber(a);
+                if (admin.isEmpty()) {
+                    // 管理员表中没找到，检查是否在普通用户表中存在
+                    if (ordinaryUserRepository.findByPhoneNumber(a).isPresent()) {
+                        return LoginResult.accountNotFound("所选身份与账号不匹配");
+                    }
+                    // 检查用户名是否存在于系统中
+                    Optional<SysUser> userByName = userRepository.findByUserName(a);
+                    if (userByName.isPresent()) {
+                        return LoginResult.accountNotFound("所选身份与账号不匹配");
+                    }
+                } else {
+                    u = userRepository.findById(admin.get().getUserId());
+                }
             }
         }
         if (u.isEmpty()) {
-            return Optional.empty();
+            return LoginResult.accountNotFound("账号/手机号不存在");
         }
-        return u.filter(x -> password.equals(x.getUserPassword()));
+        
+        String storedPassword = u.get().getUserPassword();
+        if (passwordEncoder.matches(password, storedPassword)) {
+            return LoginResult.success(u.get());
+        }
+        
+        // 向后兼容：如果BCrypt验证失败，尝试明文比较（处理历史明文密码）
+        if (password.equals(storedPassword)) {
+            // 自动将明文密码升级为加密密码
+            SysUser user = u.get();
+            user.setUserPassword(passwordEncoder.encode(password));
+            userRepository.save(user);
+            return LoginResult.success(user);
+        }
+        
+        return LoginResult.wrongPassword("密码错误");
     }
 
     public Optional<SysUser> loginBySmsCode(String phoneNumber, String code, String userType) {
@@ -73,13 +123,28 @@ public class AuthService {
             return Optional.empty();
         }
         
-        Optional<OrdinaryUser> ou = ordinaryUserRepository.findByPhoneNumber(phoneNumber.trim());
-        if (ou.isEmpty()) {
-            return Optional.empty();
-        }
+        String phone = phoneNumber.trim();
         
-        return userRepository.findById(ou.get().getUserId())
-                .filter(u -> userType.equals(u.getUserType()));
+        if (USER_TYPE_ADMIN.equals(userType)) {
+            Optional<Administrator> admin = administratorRepository.findByPhoneNumber(phone);
+            if (admin.isEmpty()) {
+                return Optional.empty();
+            }
+            return userRepository.findById(admin.get().getUserId())
+                    .filter(u -> USER_TYPE_ADMIN.equals(u.getUserType()));
+        } else {
+            // 普通用户登录：先检查是否在管理员表中存在
+            Optional<Administrator> admin = administratorRepository.findByPhoneNumber(phone);
+            if (admin.isPresent()) {
+                return Optional.empty();
+            }
+            Optional<OrdinaryUser> ou = ordinaryUserRepository.findByPhoneNumber(phone);
+            if (ou.isEmpty()) {
+                return Optional.empty();
+            }
+            return userRepository.findById(ou.get().getUserId())
+                    .filter(u -> USER_TYPE_ORDINARY.equals(u.getUserType()));
+        }
     }
 
     public String sendSmsCode(String phoneNumber) {
@@ -88,11 +153,20 @@ public class AuthService {
         }
         
         String phone = phoneNumber.trim();
-        if (!phone.matches("^1\\d{10}$")) {
+        if (!phone.matches("^1\\d{10,11}$")) {
             throw new IllegalArgumentException("请输入正确的手机号格式");
         }
         
-        if (!ordinaryUserRepository.existsByPhoneNumber(phone)) {
+        boolean existsInOrdinary = ordinaryUserRepository.existsByPhoneNumber(phone);
+        boolean existsInAdmin = administratorRepository.existsByPhoneNumber(phone);
+        System.out.println("========== 手机号检查 ==========");
+        System.out.println("手机号: " + phone);
+        System.out.println("普通用户表存在: " + existsInOrdinary);
+        System.out.println("管理员表存在: " + existsInAdmin);
+        System.out.println("=================================");
+        
+        boolean exists = existsInOrdinary || existsInAdmin;
+        if (!exists) {
             throw new IllegalArgumentException("该手机号未注册");
         }
         
@@ -130,7 +204,7 @@ public class AuthService {
         }
         
         String phone = phoneNumber.trim();
-        if (!phone.matches("^1\\d{10}$")) {
+        if (!phone.matches("^1\\d{10,11}$")) {
             throw new IllegalArgumentException("请输入正确的手机号格式");
         }
         
@@ -272,7 +346,7 @@ public class AuthService {
         }
         
         SysUser user = sysUser.get();
-        user.setUserPassword(newPassword);
+        user.setUserPassword(passwordEncoder.encode(newPassword));
         userRepository.save(user);
     }
 
@@ -281,7 +355,7 @@ public class AuthService {
             throw new IllegalArgumentException("手机号不能为空");
         }
         String phone = phoneNumber.trim();
-        if (!phone.matches("^1\\d{10}$")) {
+        if (!phone.matches("^1\\d{10,11}$")) {
             throw new IllegalArgumentException("请输入正确的手机号格式");
         }
         if (!ordinaryUserRepository.existsByPhoneNumber(phone)) {
@@ -289,6 +363,20 @@ public class AuthService {
         }
     }
 
+    public boolean checkPhoneInAdmin(String phoneNumber) {
+        if (phoneNumber == null || phoneNumber.isBlank()) {
+            return false;
+        }
+        return administratorRepository.findByPhoneNumber(phoneNumber.trim()).isPresent();
+    }
+    
+    public boolean checkPhoneInOrdinary(String phoneNumber) {
+        if (phoneNumber == null || phoneNumber.isBlank()) {
+            return false;
+        }
+        return ordinaryUserRepository.findByPhoneNumber(phoneNumber.trim()).isPresent();
+    }
+    
     public boolean verifyResetPasswordCodeByPhone(String phoneNumber, String code) {
         if (phoneNumber == null || phoneNumber.isBlank()) {
             throw new IllegalArgumentException("手机号不能为空");
@@ -335,7 +423,7 @@ public class AuthService {
         }
         
         SysUser user = sysUser.get();
-        user.setUserPassword(newPassword);
+        user.setUserPassword(passwordEncoder.encode(newPassword));
         userRepository.save(user);
     }
 
@@ -364,7 +452,7 @@ public class AuthService {
         SysUser user = new SysUser();
         user.setUserId(userId);
         user.setUserName(name);
-        user.setUserPassword(password);
+        user.setUserPassword(passwordEncoder.encode(password));
         user.setUserType(USER_TYPE_ORDINARY);
         userRepository.save(user);
 

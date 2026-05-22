@@ -1,5 +1,10 @@
 package com.travel.travelweb.api;
 
+import java.io.IOException;
+import java.util.ArrayList;
+
+import org.springframework.http.MediaType;
+import org.springframework.web.multipart.MultipartFile;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -79,25 +84,41 @@ public class AppApiController {
             @RequestParam(defaultValue = "2") String userType,
             @RequestParam(defaultValue = "password") String loginType) {
         
-        Optional<SysUser> u;
-        
         if ("sms".equals(loginType)) {
-            u = authService.loginBySmsCode(account, code, userType);
+            Optional<SysUser> u = authService.loginBySmsCode(account, code, userType);
+            if (u.isEmpty()) {
+                String phone = account.trim();
+                boolean isAdmin = "1".equals(userType);
+                boolean isPhoneInAdmin = authService.checkPhoneInAdmin(phone);
+                boolean isPhoneInOrdinary = authService.checkPhoneInOrdinary(phone);
+                
+                String errorMsg = "手机号或验证码错误";
+                if (isAdmin && isPhoneInOrdinary) {
+                    errorMsg = "所选身份与账号不匹配";
+                } else if (!isAdmin && isPhoneInAdmin) {
+                    errorMsg = "所选身份与账号不匹配";
+                }
+                
+                return ResponseEntity.ok(ApiResponse.error(errorMsg));
+            }
+            SysUser user = u.get();
+            Map<String, Object> data = new HashMap<>();
+            data.put("userId", user.getUserId());
+            data.put("userName", user.getUserName());
+            data.put("userType", user.getUserType());
+            return ResponseEntity.ok(ApiResponse.success(data));
         } else {
-            u = authService.login(account, password, userType);
+            com.travel.travelweb.service.LoginResult result = authService.login(account, password, userType);
+            if (!result.isSuccess()) {
+                return ResponseEntity.ok(ApiResponse.error(result.getErrorMessage()));
+            }
+            SysUser user = result.getUser().get();
+            Map<String, Object> data = new HashMap<>();
+            data.put("userId", user.getUserId());
+            data.put("userName", user.getUserName());
+            data.put("userType", user.getUserType());
+            return ResponseEntity.ok(ApiResponse.success(data));
         }
-        
-        if (u.isEmpty()) {
-            return ResponseEntity.ok(ApiResponse.error("账号或密码错误，或所选身份与账号类型不匹配"));
-        }
-        
-        SysUser user = u.get();
-        Map<String, Object> data = new HashMap<>();
-        data.put("userId", user.getUserId());
-        data.put("userName", user.getUserName());
-        data.put("userType", user.getUserType());
-        
-        return ResponseEntity.ok(ApiResponse.success(data));
     }
 
     @PostMapping("/register")
@@ -152,7 +173,86 @@ public class AppApiController {
     }
 
     // --- 景点模块 ---
-    // 注意：/api/landscapes/home、/api/landscapes、/api/landscapes/{id} 接口已在 ApiController 中定义，此处不再重复
+    // 注意：/api/landscapes/home、/api/landscapes、/api/landscapes/{id} 列表/详情在 ApiController
+
+    /**
+     * 安卓发布景点（POST JSON）。与 ApiController#createLandscape 等价。
+     * 路径 /landscapes/publish 便于确认新后端已部署（旧服务仅 Allow:GET）。
+     */
+    @PostMapping(value = "/landscapes/publish", consumes = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<ApiResponse<Landscape>> publishLandscape(
+            @RequestBody LandscapeRequest request,
+            @RequestHeader(value = "X-User-Id", required = false) String userId) {
+        if (userId == null || userId.isBlank()) {
+            return ResponseEntity.status(401).body(ApiResponse.error(401, "用户未登录"));
+        }
+        if (request.getTitle() == null || request.getTitle().isBlank()) {
+            return ResponseEntity.badRequest().body(ApiResponse.error("景点名称不能为空"));
+        }
+        if (request.getAddress() == null || request.getAddress().isBlank()) {
+            return ResponseEntity.badRequest().body(ApiResponse.error("景点地点不能为空"));
+        }
+        try {
+            String id = landscapeService.createLandscape(
+                    userId,
+                    request.getTitle().trim(),
+                    request.getContent() != null ? request.getContent().trim() : "",
+                    request.getAddress().trim(),
+                    request.getLatitude(),
+                    request.getLongitude(),
+                    request.resolveTel(),
+                    request.getOpeningTime(),
+                    request.getLevel(),
+                    null);
+            return landscapeService.findById(id)
+                    .map(l -> ResponseEntity.ok(ApiResponse.success(l)))
+                    .orElse(ResponseEntity.ok(ApiResponse.error("创建成功但查询失败")));
+        } catch (IOException e) {
+            return ResponseEntity.status(500).body(ApiResponse.error(500, "发布失败"));
+        }
+    }
+
+    /** 安卓发布景点（含图片上传，multipart/form-data） */
+    @PostMapping(value = "/landscapes/publish", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<ApiResponse<Landscape>> publishLandscapeMultipart(
+            @RequestHeader(value = "X-User-Id", required = false) String userId,
+            @RequestParam String title,
+            @RequestParam String address,
+            @RequestParam(required = false) String content,
+            @RequestParam(required = false) Double latitude,
+            @RequestParam(required = false) Double longitude,
+            @RequestParam(required = false) String tel,
+            @RequestParam(required = false) String openingTime,
+            @RequestParam(required = false) String level,
+            @RequestPart(value = "image", required = false) MultipartFile image) {
+        if (userId == null || userId.isBlank()) {
+            return ResponseEntity.status(401).body(ApiResponse.error(401, "用户未登录"));
+        }
+        if (title == null || title.isBlank()) {
+            return ResponseEntity.badRequest().body(ApiResponse.error("景点名称不能为空"));
+        }
+        if (address == null || address.isBlank()) {
+            return ResponseEntity.badRequest().body(ApiResponse.error("景点地点不能为空"));
+        }
+        try {
+            String id = landscapeService.createLandscape(
+                    userId,
+                    title.trim(),
+                    content != null ? content.trim() : "",
+                    address.trim(),
+                    latitude,
+                    longitude,
+                    tel,
+                    openingTime,
+                    level,
+                    image);
+            return landscapeService.findById(id)
+                    .map(l -> ResponseEntity.ok(ApiResponse.success(l)))
+                    .orElse(ResponseEntity.ok(ApiResponse.error("创建成功但查询失败")));
+        } catch (IOException e) {
+            return ResponseEntity.status(500).body(ApiResponse.error(500, "发布失败"));
+        }
+    }
 
     private LandscapeResponse toLandscapeResponse(Landscape l) {
         LandscapeResponse response = new LandscapeResponse();
@@ -201,6 +301,93 @@ public class AppApiController {
     // 注意：/api/comments 接口已在 ApiController 中定义，此处不再重复
 
     // --- 点赞收藏模块 ---
+    @GetMapping("/interactions/status")
+    public ResponseEntity<ApiResponse<InteractionStatusResponse>> interactionStatus(
+            @RequestParam(required = false) String landscapeId,
+            @RequestParam(required = false) String postId,
+            @RequestHeader(value = "X-User-Id", required = false) String userId) {
+
+        if (userId == null || userId.isBlank()) {
+            return ResponseEntity.ok(ApiResponse.error(401, "用户未登录"));
+        }
+
+        InteractionStatusResponse status = new InteractionStatusResponse();
+        if (landscapeId != null && !landscapeId.isBlank()) {
+            status.setLiked(landInteractionService.liked(landscapeId, userId));
+            status.setFavorited(landInteractionService.collected(landscapeId, userId));
+            landLikeRepository.findByLandscapeIdAndUserId(landscapeId, userId)
+                    .ifPresent(l -> status.setLikeId(l.getLikeId()));
+            landCollectRepository.findByLandscapeIdAndUserId(landscapeId, userId)
+                    .ifPresent(c -> status.setFavoriteId(c.getCollectId()));
+        } else if (postId != null && !postId.isBlank()) {
+            status.setLiked(postInteractionService.liked(postId, userId));
+            status.setFavorited(postInteractionService.collected(postId, userId));
+            postLikeRepository.findByRecomIdAndUserId(postId, userId)
+                    .ifPresent(l -> status.setLikeId(l.getLikeId()));
+            postCollectRepository.findByRecomIdAndUserId(postId, userId)
+                    .ifPresent(c -> status.setFavoriteId(c.getCollectId()));
+        } else {
+            return ResponseEntity.ok(ApiResponse.error("必须指定 landscapeId 或 postId"));
+        }
+        return ResponseEntity.ok(ApiResponse.success(status));
+    }
+
+    @GetMapping("/users/me/interactions/landscapes/likes")
+    public ResponseEntity<ApiResponse<List<LandscapeBackendResponse>>> myLandscapeLikes(
+            @RequestHeader(value = "X-User-Id", required = false) String userId) {
+        if (userId == null || userId.isBlank()) {
+            return ResponseEntity.ok(ApiResponse.error(401, "用户未登录"));
+        }
+        List<LandscapeBackendResponse> result = new ArrayList<>();
+        for (var like : landLikeRepository.findByUserIdOrderByLikeTimeDesc(userId)) {
+            landscapeService.findApproved(like.getLandscapeId())
+                    .map(this::toLandscapeBackendResponse)
+                    .ifPresent(result::add);
+        }
+        return ResponseEntity.ok(ApiResponse.success(result));
+    }
+
+    @GetMapping("/users/me/interactions/landscapes/favorites")
+    public ResponseEntity<ApiResponse<List<LandscapeBackendResponse>>> myLandscapeFavorites(
+            @RequestHeader(value = "X-User-Id", required = false) String userId) {
+        if (userId == null || userId.isBlank()) {
+            return ResponseEntity.ok(ApiResponse.error(401, "用户未登录"));
+        }
+        List<LandscapeBackendResponse> result = new ArrayList<>();
+        for (var collect : landCollectRepository.findByUserIdOrderByCollectTimeDesc(userId)) {
+            landscapeService.findApproved(collect.getLandscapeId())
+                    .map(this::toLandscapeBackendResponse)
+                    .ifPresent(result::add);
+        }
+        return ResponseEntity.ok(ApiResponse.success(result));
+    }
+
+    @GetMapping("/users/me/interactions/posts/likes")
+    public ResponseEntity<ApiResponse<List<RecommendationPost>>> myPostLikes(
+            @RequestHeader(value = "X-User-Id", required = false) String userId) {
+        if (userId == null || userId.isBlank()) {
+            return ResponseEntity.ok(ApiResponse.error(401, "用户未登录"));
+        }
+        List<RecommendationPost> result = new ArrayList<>();
+        for (var like : postLikeRepository.findByUserIdOrderByLikeTimeDesc(userId)) {
+            postService.findApproved(like.getRecomId()).ifPresent(result::add);
+        }
+        return ResponseEntity.ok(ApiResponse.success(result));
+    }
+
+    @GetMapping("/users/me/interactions/posts/favorites")
+    public ResponseEntity<ApiResponse<List<RecommendationPost>>> myPostFavorites(
+            @RequestHeader(value = "X-User-Id", required = false) String userId) {
+        if (userId == null || userId.isBlank()) {
+            return ResponseEntity.ok(ApiResponse.error(401, "用户未登录"));
+        }
+        List<RecommendationPost> result = new ArrayList<>();
+        for (var collect : postCollectRepository.findByUserIdOrderByCollectTimeDesc(userId)) {
+            postService.findApproved(collect.getRecomId()).ifPresent(result::add);
+        }
+        return ResponseEntity.ok(ApiResponse.success(result));
+    }
+
     @PostMapping("/interactions/favorites")
     public ResponseEntity<ApiResponse<InteractionResponse>> addFavorite(
             @RequestBody FavoriteRequest request,
@@ -210,11 +397,15 @@ public class AppApiController {
             return ResponseEntity.ok(ApiResponse.error(401, "用户未登录"));
         }
         
-        String targetId = request.getTargetId();
+        String targetId = InteractionRequestSupport.resolveTargetId(request);
         String targetType = request.getTargetType();
         
+        if (targetId == null || targetId.isBlank()) {
+            return ResponseEntity.ok(ApiResponse.error("缺少目标 ID"));
+        }
+        
         try {
-            if ("landscape".equals(targetType)) {
+            if (InteractionRequestSupport.isLandscapeType(targetType)) {
                 boolean collected = landInteractionService.toggleCollect(targetId, userId);
                 if (collected) {
                     String collectId = landCollectRepository
@@ -222,9 +413,10 @@ public class AppApiController {
                             .map(com.travel.travelweb.entity.LandCollect::getCollectId)
                             .orElse(null);
                     return ResponseEntity.ok(ApiResponse.success(
-                            new InteractionResponse(collectId, targetId, targetType, userId)));
+                            new InteractionResponse(collectId, "LANDSCAPE", targetId, null, request.getLinkUrl())));
                 }
-            } else if ("post".equals(targetType)) {
+                return ResponseEntity.ok(ApiResponse.success(null));
+            } else if (InteractionRequestSupport.isPostType(targetType)) {
                 boolean collected = postInteractionService.toggleCollect(targetId, userId);
                 if (collected) {
                     String collectId = postCollectRepository
@@ -232,10 +424,11 @@ public class AppApiController {
                             .map(com.travel.travelweb.entity.PostCollect::getCollectId)
                             .orElse(null);
                     return ResponseEntity.ok(ApiResponse.success(
-                            new InteractionResponse(collectId, targetId, targetType, userId)));
+                            new InteractionResponse(collectId, "POST", null, targetId, request.getLinkUrl())));
                 }
+                return ResponseEntity.ok(ApiResponse.success(null));
             }
-            return ResponseEntity.ok(ApiResponse.success(null));
+            return ResponseEntity.ok(ApiResponse.error("targetType 无效，应为 LANDSCAPE 或 POST"));
         } catch (Exception e) {
             return ResponseEntity.ok(ApiResponse.error("操作失败"));
         }
@@ -276,11 +469,15 @@ public class AppApiController {
             return ResponseEntity.ok(ApiResponse.error(401, "用户未登录"));
         }
         
-        String targetId = request.getTargetId();
+        String targetId = InteractionRequestSupport.resolveTargetId(request);
         String targetType = request.getTargetType();
         
+        if (targetId == null || targetId.isBlank()) {
+            return ResponseEntity.ok(ApiResponse.error("缺少目标 ID"));
+        }
+        
         try {
-            if ("landscape".equals(targetType)) {
+            if (InteractionRequestSupport.isLandscapeType(targetType)) {
                 boolean liked = landInteractionService.toggleLike(targetId, userId);
                 if (liked) {
                     String likeId = landLikeRepository
@@ -288,9 +485,10 @@ public class AppApiController {
                             .map(com.travel.travelweb.entity.LandLike::getLikeId)
                             .orElse(null);
                     return ResponseEntity.ok(ApiResponse.success(
-                            new InteractionResponse(likeId, targetId, targetType, userId)));
+                            new InteractionResponse(likeId, "LANDSCAPE", targetId, null, request.getLinkUrl())));
                 }
-            } else if ("post".equals(targetType)) {
+                return ResponseEntity.ok(ApiResponse.success(null));
+            } else if (InteractionRequestSupport.isPostType(targetType)) {
                 boolean liked = postInteractionService.toggleLike(targetId, userId);
                 if (liked) {
                     String likeId = postLikeRepository
@@ -298,10 +496,11 @@ public class AppApiController {
                             .map(com.travel.travelweb.entity.PostLike::getLikeId)
                             .orElse(null);
                     return ResponseEntity.ok(ApiResponse.success(
-                            new InteractionResponse(likeId, targetId, targetType, userId)));
+                            new InteractionResponse(likeId, "POST", null, targetId, request.getLinkUrl())));
                 }
+                return ResponseEntity.ok(ApiResponse.success(null));
             }
-            return ResponseEntity.ok(ApiResponse.success(null));
+            return ResponseEntity.ok(ApiResponse.error("targetType 无效，应为 LANDSCAPE 或 POST"));
         } catch (Exception e) {
             return ResponseEntity.ok(ApiResponse.error("操作失败"));
         }

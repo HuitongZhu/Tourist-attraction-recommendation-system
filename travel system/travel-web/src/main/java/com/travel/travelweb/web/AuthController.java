@@ -59,34 +59,49 @@ public class AuthController {
             HttpSession session,
             RedirectAttributes ra) {
         
-        Optional<SysUser> u;
+        SysUser user;
         
         if ("sms".equals(loginType)) {
-            u = authService.loginBySmsCode(account, code, userType);
+            Optional<SysUser> u = authService.loginBySmsCode(account, code, userType);
             if (u.isEmpty()) {
-                ra.addFlashAttribute("error", "验证码错误或已过期");
+                // 检查是否是身份不匹配
+                String phone = account.trim();
+                boolean isAdmin = "1".equals(userType);
+                boolean isPhoneInAdmin = authService.checkPhoneInAdmin(phone);
+                boolean isPhoneInOrdinary = authService.checkPhoneInOrdinary(phone);
+                
+                String errorMsg = "验证码错误或已过期";
+                if (isAdmin && isPhoneInOrdinary) {
+                    errorMsg = "所选身份与账号不匹配";
+                } else if (!isAdmin && isPhoneInAdmin) {
+                    errorMsg = "所选身份与账号不匹配";
+                }
+                
+                ra.addFlashAttribute("error", errorMsg);
                 return "redirect:/login?next=" + java.net.URLEncoder.encode(next, java.nio.charset.StandardCharsets.UTF_8) 
                     + "&account=" + java.net.URLEncoder.encode(account, java.nio.charset.StandardCharsets.UTF_8)
                     + "&userType=" + java.net.URLEncoder.encode(userType, java.nio.charset.StandardCharsets.UTF_8)
                     + "&loginType=" + java.net.URLEncoder.encode(loginType, java.nio.charset.StandardCharsets.UTF_8);
             }
+            user = u.get();
         } else {
-            u = authService.login(account, password, userType);
-            if (u.isEmpty()) {
-                ra.addFlashAttribute("error", "账号或密码错误，或所选身份与账号类型不匹配");
+            com.travel.travelweb.service.LoginResult result = authService.login(account, password, userType);
+            if (!result.isSuccess()) {
+                ra.addFlashAttribute("error", result.getErrorMessage());
                 return "redirect:/login?next=" + java.net.URLEncoder.encode(next, java.nio.charset.StandardCharsets.UTF_8) 
                     + "&account=" + java.net.URLEncoder.encode(account, java.nio.charset.StandardCharsets.UTF_8)
                     + "&userType=" + java.net.URLEncoder.encode(userType, java.nio.charset.StandardCharsets.UTF_8)
                     + "&loginType=" + java.net.URLEncoder.encode(loginType, java.nio.charset.StandardCharsets.UTF_8);
             }
+            user = result.getUser().get();
         }
         
-        session.setAttribute(LoginInterceptor.SESSION_USER_ID, u.get().getUserId());
-        session.setAttribute(LoginInterceptor.SESSION_USER_NAME, u.get().getUserName());
-        session.setAttribute(LoginInterceptor.SESSION_USER_TYPE, u.get().getUserType());
+        session.setAttribute(LoginInterceptor.SESSION_USER_ID, user.getUserId());
+        session.setAttribute(LoginInterceptor.SESSION_USER_NAME, user.getUserName());
+        session.setAttribute(LoginInterceptor.SESSION_USER_TYPE, user.getUserType());
         
         String redirectUrl;
-        if ("1".equals(u.get().getUserType())) {
+        if ("1".equals(user.getUserType())) {
             redirectUrl = "/admin";
         } else {
             redirectUrl = "/";

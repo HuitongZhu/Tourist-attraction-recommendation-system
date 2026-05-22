@@ -7,10 +7,23 @@ public class LandscapeRequest {
     private Double latitude;
     private Double longitude;
     private String tel;
+    /** 安卓端字段名，与 tel 二选一 */
+    private String contactPhone;
     private String openingTime;
     private String level;
 
     public LandscapeRequest() {}
+
+    /** 兼容 contactPhone / tel */
+    public String resolveTel() {
+        if (tel != null && !tel.isBlank()) {
+            return tel.trim();
+        }
+        if (contactPhone != null && !contactPhone.isBlank()) {
+            return contactPhone.trim();
+        }
+        return null;
+    }
 
     public String getTitle() { return title; }
     public void setTitle(String title) { this.title = title; }
@@ -24,6 +37,8 @@ public class LandscapeRequest {
     public void setLongitude(Double longitude) { this.longitude = longitude; }
     public String getTel() { return tel; }
     public void setTel(String tel) { this.tel = tel; }
+    public String getContactPhone() { return contactPhone; }
+    public void setContactPhone(String contactPhone) { this.contactPhone = contactPhone; }
     public String getOpeningTime() { return openingTime; }
     public void setOpeningTime(String openingTime) { this.openingTime = openingTime; }
     public String getLevel() { return level; }

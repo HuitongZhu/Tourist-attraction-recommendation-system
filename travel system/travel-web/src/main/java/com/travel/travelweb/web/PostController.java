@@ -144,7 +144,8 @@ public class PostController {
                        @RequestParam(required = false) String landscapeId, 
                        @RequestParam(required = false) String tag, 
                        @RequestParam String content, 
-                       HttpSession session) {
+                       HttpSession session,
+                       org.springframework.web.servlet.mvc.support.RedirectAttributes ra) {
         String userId = (String) session.getAttribute(LoginInterceptor.SESSION_USER_ID);
         if (userId == null) {
             return "redirect:/login?next=/posts/new";
@@ -155,9 +156,15 @@ public class PostController {
         System.out.println("landscapeId: " + landscapeId);
         System.out.println("tag: " + tag);
         System.out.println("content: " + content);
-        postService.createPost(userId, title, landscapeId, tag, content);
-        System.out.println("推荐帖发布成功！");
-        return "redirect:/posts";
+        try {
+            postService.createPost(userId, title, landscapeId, tag, content);
+            System.out.println("推荐帖发布成功！");
+            return "redirect:/posts";
+        } catch (IllegalArgumentException e) {
+            System.out.println("发布失败: " + e.getMessage());
+            ra.addFlashAttribute("msg", e.getMessage());
+            return "redirect:/posts/new";
+        }
     }
 
     @GetMapping("/posts/edit/{id}")

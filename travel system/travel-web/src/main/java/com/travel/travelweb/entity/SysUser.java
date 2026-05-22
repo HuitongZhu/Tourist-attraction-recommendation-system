@@ -16,7 +16,7 @@ public class SysUser {
     @Column(name = "userName", length = 30)
     private String userName;
 
-    @Column(name = "userPassword", length = 30)
+    @Column(name = "userPassword", length = 100)
     private String userPassword;
 
     /** 1 管理员 2 普通用户 */

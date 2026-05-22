@@ -143,6 +143,12 @@ public class PostService {
         if (content == null || content.isBlank()) {
             throw new IllegalArgumentException("内容不能为空");
         }
+        if (landscapeId == null || landscapeId.isBlank()) {
+            throw new IllegalArgumentException("关联景点不能为空");
+        }
+        if (!landscapeRepository.existsById(landscapeId)) {
+            throw new IllegalArgumentException("关联的景点不存在");
+        }
         RecommendationPost post = new RecommendationPost();
         post.setRecomId(IdGenerator.next("REC"));
         post.setUserId(userId);

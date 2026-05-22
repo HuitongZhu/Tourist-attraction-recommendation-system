@@ -130,6 +130,9 @@ public class LandscapeController {
             String id = landscapeService.createLandscape(uid, title, content, address, latitude, longitude, landscapeTel, openingTime, level, image);
             ra.addFlashAttribute("msg", "提交成功，等待管理员审核");
             return "redirect:/landscapes/" + id;
+        } catch (IllegalArgumentException e) {
+            ra.addFlashAttribute("msg", e.getMessage());
+            return "redirect:/landscapes/new";
         } catch (IOException e) {
             ra.addFlashAttribute("msg", "图片上传失败，请重试");
             return "redirect:/landscapes/new";

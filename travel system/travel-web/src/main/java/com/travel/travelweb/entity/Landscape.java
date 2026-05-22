@@ -21,7 +21,7 @@ public class Landscape {
     @Column(name = "Title", length = 50)
     private String title;
 
-    @Column(name = "Content", columnDefinition = "text")
+    @Column(name = "Content", columnDefinition = "TEXT")
     private String content;
 
     @Column(name = "Address", length = 100)

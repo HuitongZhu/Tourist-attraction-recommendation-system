@@ -502,6 +502,10 @@
             outline: none;
             border-color: #1890ff;
         }
+        @keyframes rotate {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
     </style>
 </head>
 <body>
@@ -536,6 +540,10 @@
                 <li class="sidebar-item" onclick="switchView('post-audit')">
                     <span class="sidebar-icon"><i class="layui-icon layui-icon-edit"></i></span>
                     <span>审核推荐帖</span>
+                </li>
+                <li class="sidebar-item" onclick="switchView('comment-audit')">
+                    <span class="sidebar-icon"><i class="layui-icon layui-icon-chat"></i></span>
+                    <span>审核评论</span>
                 </li>
             </ul>
         </div>
@@ -737,6 +745,22 @@
                     </div>
                 </div>
             </div>
+
+            <div id="comment-audit" class="content-view">
+                <div class="search-bar">
+                    <h3 class="page-title">审核评论</h3>
+                    <div class="search-group">
+                        <input type="text" class="search-input" id="comment-keyword" placeholder="搜索评论内容/用户/关联内容" onkeyup="if(event.keyCode==13)searchComments()">
+                        <button class="search-btn" onclick="searchComments()">搜索</button>
+                    </div>
+                </div>
+                <div class="post-list" id="comment-list">
+                    <div class="empty-state">
+                        <i class="layui-icon layui-icon-chat" style="font-size: 48px; display: block; margin-bottom: 15px;"></i>
+                        <p>暂无评论信息</p>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -748,6 +772,10 @@
             
             event.currentTarget.classList.add('active');
             document.getElementById(viewId).classList.add('active');
+            
+            if (viewId === 'comment-audit') {
+                searchComments();
+            }
         }
 
         function deleteUser(id) {
@@ -970,6 +998,51 @@
                 }
             };
             xhr.send();
+        }
+
+        function searchComments() {
+            var keyword = document.getElementById('comment-keyword').value;
+            var url = '/admin/comments/search?';
+            if (keyword && keyword.trim() !== '') {
+                url += 'keyword=' + encodeURIComponent(keyword.trim());
+            }
+            document.getElementById('comment-list').innerHTML = '<div class="empty-state"><i class="layui-icon layui-icon-loading-1" style="font-size: 48px; display: block; margin-bottom: 15px; animation: rotate 1s linear infinite;"></i><p>加载中...</p></div>';
+            var xhr = new XMLHttpRequest();
+            xhr.open('GET', url);
+            xhr.onload = function() {
+                if (xhr.status === 200) {
+                    document.getElementById('comment-list').innerHTML = xhr.responseText;
+                } else {
+                    document.getElementById('comment-list').innerHTML = '<div class="empty-state"><p>加载失败，状态码: ' + xhr.status + '</p></div>';
+                }
+            };
+            xhr.onerror = function() {
+                document.getElementById('comment-list').innerHTML = '<div class="empty-state"><p>请求失败，请检查网络连接</p></div>';
+            };
+            xhr.send();
+        }
+
+        function deleteComment(id, type) {
+            layer.confirm('确定删除该评论？', {
+                btn: ['确定', '取消']
+            }, function(index) {
+                layer.close(index);
+                var xhr = new XMLHttpRequest();
+                xhr.open('POST', '/admin/comments/delete');
+                xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+                xhr.onload = function() {
+                    if (xhr.responseText === 'success') {
+                        layer.msg('删除成功', {icon: 1});
+                        var card = document.getElementById('comment-card-' + id);
+                        if (card) {
+                            card.remove();
+                        }
+                    } else {
+                        layer.msg('删除失败', {icon: 2});
+                    }
+                };
+                xhr.send('id=' + id + '&type=' + type);
+            });
         }
     </script>
 </body>

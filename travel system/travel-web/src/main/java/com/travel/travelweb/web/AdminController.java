@@ -1,6 +1,11 @@
 package com.travel.travelweb.web;
 
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -12,17 +17,24 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
 
 import com.travel.travelweb.config.LoginInterceptor;
+import com.travel.travelweb.entity.LandComment;
 import com.travel.travelweb.entity.Landscape;
 import com.travel.travelweb.entity.OrdinaryUser;
+import com.travel.travelweb.entity.PostComment;
 import com.travel.travelweb.entity.RecommendationPost;
 import com.travel.travelweb.entity.SysUser;
+import com.travel.travelweb.repo.LandCommentRepository;
+import com.travel.travelweb.repo.LandscapeRepository;
 import com.travel.travelweb.repo.OrdinaryUserRepository;
+import com.travel.travelweb.repo.PostCommentRepository;
 import com.travel.travelweb.repo.RecommendationPostRepository;
+import com.travel.travelweb.repo.SysUserRepository;
 import com.travel.travelweb.service.LandCommentService;
 import com.travel.travelweb.service.LandscapeService;
 import com.travel.travelweb.service.PostService;
 import com.travel.travelweb.service.RecommendationPostService;
 import com.travel.travelweb.service.UserService;
+import com.travel.travelweb.web.dto.CommentView;
 
 import jakarta.servlet.http.HttpSession;
 
@@ -37,13 +49,21 @@ public class AdminController {
     private final RecommendationPostService recommendationPostService;
     private final LandCommentService landCommentService;
     private final PostService postService;
+    private final LandCommentRepository landCommentRepository;
+    private final PostCommentRepository postCommentRepository;
+    private final LandscapeRepository landscapeRepository;
+    private final SysUserRepository sysUserRepository;
 
     public AdminController(LandscapeService landscapeService, UserService userService, 
                           RecommendationPostRepository postRepository,
                           OrdinaryUserRepository ordinaryUserRepository,
                           RecommendationPostService recommendationPostService,
                           LandCommentService landCommentService,
-                          PostService postService) {
+                          PostService postService,
+                          LandCommentRepository landCommentRepository,
+                          PostCommentRepository postCommentRepository,
+                          LandscapeRepository landscapeRepository,
+                          SysUserRepository sysUserRepository) {
         this.landscapeService = landscapeService;
         this.userService = userService;
         this.postRepository = postRepository;
@@ -51,6 +71,10 @@ public class AdminController {
         this.recommendationPostService = recommendationPostService;
         this.landCommentService = landCommentService;
         this.postService = postService;
+        this.landCommentRepository = landCommentRepository;
+        this.postCommentRepository = postCommentRepository;
+        this.landscapeRepository = landscapeRepository;
+        this.sysUserRepository = sysUserRepository;
     }
 
     @GetMapping("")
@@ -306,5 +330,154 @@ public class AdminController {
                    .replace(">", "&gt;")
                    .replace("\"", "&quot;")
                    .replace("'", "&#39;");
+    }
+
+    @GetMapping("/comments/search")
+    @ResponseBody
+    public String searchComments(@RequestParam(required = false) String keyword) {
+        StringBuilder html = new StringBuilder();
+        
+        try {
+            List<PostComment> postComments = postCommentRepository.findAll();
+            List<LandComment> landComments = landCommentRepository.findAll();
+            
+            Map<String, String> postTitleMap = new HashMap<>();
+            for (RecommendationPost p : postRepository.findAll()) {
+                postTitleMap.put(p.getRecomId(), p.getTitle());
+            }
+            
+            Map<String, String> landscapeTitleMap = new HashMap<>();
+            for (Landscape l : landscapeRepository.findAll()) {
+                landscapeTitleMap.put(l.getLandscapeId(), l.getTitle());
+            }
+            
+            Map<String, String> userNameMap = new HashMap<>();
+            for (SysUser u : sysUserRepository.findAll()) {
+                userNameMap.put(u.getUserId(), u.getUserName() != null ? u.getUserName() : u.getUserId());
+            }
+            
+            List<CommentView> allComments = new ArrayList<>();
+            
+            for (PostComment c : postComments) {
+                if (c.getCommentId() == null || c.getContent() == null) continue;
+                
+                boolean matchesKeyword = true;
+                if (keyword != null && !keyword.trim().isEmpty()) {
+                    String lowerKeyword = keyword.toLowerCase().trim();
+                    String content = c.getContent() != null ? c.getContent().toLowerCase() : "";
+                    String userId = c.getUserId();
+                    String userNameVal = userId != null ? userNameMap.getOrDefault(userId, "") : "";
+                    String userName = userNameVal != null ? userNameVal.toLowerCase() : "";
+                    String recomId = c.getRecomId();
+                    String refTitleVal = recomId != null ? postTitleMap.getOrDefault(recomId, "") : "";
+                    String refTitle = refTitleVal != null ? refTitleVal.toLowerCase() : "";
+                    matchesKeyword = content.contains(lowerKeyword) || 
+                                   userName.contains(lowerKeyword) || 
+                                   refTitle.contains(lowerKeyword);
+                }
+                
+                if (matchesKeyword) {
+                    String userId = c.getUserId();
+                    allComments.add(new CommentView(
+                            c.getCommentId(),
+                            userId,
+                            userNameMap.getOrDefault(userId, userId != null ? userId : "未知用户"),
+                            c.getContent(),
+                            c.getPublishTime(),
+                            "post",
+                            c.getRecomId(),
+                            postTitleMap.getOrDefault(c.getRecomId(), "未知推荐帖")
+                    ));
+                }
+            }
+            
+            for (LandComment c : landComments) {
+                if (c.getCommentId() == null || c.getContent() == null) continue;
+                
+                boolean matchesKeyword = true;
+                if (keyword != null && !keyword.trim().isEmpty()) {
+                    String lowerKeyword = keyword.toLowerCase().trim();
+                    String content = c.getContent() != null ? c.getContent().toLowerCase() : "";
+                    String userId = c.getUserId();
+                    String userNameVal = userId != null ? userNameMap.getOrDefault(userId, "") : "";
+                    String userName = userNameVal != null ? userNameVal.toLowerCase() : "";
+                    String landscapeId = c.getLandscapeId();
+                    String refTitleVal = landscapeId != null ? landscapeTitleMap.getOrDefault(landscapeId, "") : "";
+                    String refTitle = refTitleVal != null ? refTitleVal.toLowerCase() : "";
+                    matchesKeyword = content.contains(lowerKeyword) || 
+                                   userName.contains(lowerKeyword) || 
+                                   refTitle.contains(lowerKeyword);
+                }
+                
+                if (matchesKeyword) {
+                    String userId = c.getUserId();
+                    allComments.add(new CommentView(
+                            c.getCommentId(),
+                            userId,
+                            userNameMap.getOrDefault(userId, userId != null ? userId : "未知用户"),
+                            c.getContent(),
+                            c.getPublishTime(),
+                            "landscape",
+                            c.getLandscapeId(),
+                            landscapeTitleMap.getOrDefault(c.getLandscapeId(), "未知景点")
+                    ));
+                }
+            }
+            
+            allComments.sort((a, b) -> {
+                if (a.getPublishTime() == null && b.getPublishTime() == null) return 0;
+                if (a.getPublishTime() == null) return 1;
+                if (b.getPublishTime() == null) return -1;
+                return b.getPublishTime().compareTo(a.getPublishTime());
+            });
+            
+            if (allComments.isEmpty()) {
+                html.append("<div class=\"empty-state\">");
+                html.append("<i class=\"layui-icon layui-icon-chat\" style=\"font-size: 48px; display: block; margin-bottom: 15px;\"></i>");
+                html.append("<p>暂无评论信息</p>");
+                html.append("</div>");
+            } else {
+                for (CommentView comment : allComments) {
+                    String refTypeName = "landscape".equals(comment.getRefType()) ? "景点" : "推荐帖";
+                    String content = comment.getContent() != null ? escapeHtml(comment.getContent()) : "";
+                    String refTitle = comment.getRefTitle() != null ? escapeHtml(comment.getRefTitle()) : "";
+                    String userName = comment.getUserName() != null ? escapeHtml(comment.getUserName()) : "";
+                    String timeStr = comment.getPublishTime() != null ? 
+                        java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss").format(comment.getPublishTime()) : "";
+                    
+                    html.append("<div class=\"landscape-card\" id=\"comment-card-").append(comment.getCommentId()).append("\">");
+                    html.append("<div class=\"landscape-header\"><div>");
+                    html.append("<span class=\"landscape-title\">").append(content).append("</span>");
+                    html.append("</div></div>");
+                    html.append("<div class=\"landscape-meta\">");
+                    html.append("<span>").append(refTypeName).append("：").append(refTitle).append("</span>");
+                    html.append("<span>发表用户：").append(userName).append("</span>");
+                    html.append("<span>发表时间：").append(timeStr).append("</span>");
+                    html.append("</div>");
+                    html.append("<div class=\"landscape-actions\">");
+                    html.append("<button class=\"action-btn delete-btn\" onclick=\"deleteComment('").append(comment.getCommentId()).append("', '").append(comment.getRefType()).append("')\">删除</button>");
+                    html.append("</div></div>");
+                }
+            }
+        } catch (Exception e) {
+            html.append("<div class=\"empty-state\">");
+            html.append("<i class=\"layui-icon layui-icon-chat\" style=\"font-size: 48px; display: block; margin-bottom: 15px;\"></i>");
+            html.append("<p>加载评论失败: ").append(e.getMessage()).append("</p>");
+            html.append("</div>");
+        }
+
+        return html.toString();
+    }
+
+    @PostMapping("/comments/delete")
+    @ResponseBody
+    public String deleteComment(@RequestParam String id, @RequestParam String type) {
+        boolean success;
+        if ("landscape".equals(type)) {
+            success = landCommentService.deleteByAdmin(id);
+        } else {
+            success = postService.deleteCommentByAdmin(id);
+        }
+        return success ? "success" : "fail";
     }
 }

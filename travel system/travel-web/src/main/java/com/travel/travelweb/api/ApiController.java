@@ -12,14 +12,18 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 
 import com.travel.travelweb.api.dto.CommentRequest;
 import com.travel.travelweb.api.dto.CommentResponse;
+import com.travel.travelweb.api.dto.LandscapeRequest;
 import com.travel.travelweb.api.dto.PageResponse;
 import com.travel.travelweb.entity.Landscape;
 import com.travel.travelweb.entity.RecommendationPost;
@@ -62,6 +66,75 @@ public class ApiController {
         result.put("landscapes", landscapes);
         result.put("total", landscapes.size());
         return ResponseEntity.ok(ApiResponse.success(result));
+    }
+
+    // 发布景点（JSON）
+    @PostMapping(value = "/landscapes", consumes = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<ApiResponse<Landscape>> createLandscape(
+            @RequestBody LandscapeRequest request,
+            @RequestHeader(value = "X-User-Id", required = false) String userId) {
+        if (userId == null || userId.isBlank()) {
+            return ResponseEntity.status(401).body(ApiResponse.error(401, "用户未登录"));
+        }
+        if (request.getTitle() == null || request.getTitle().isBlank()) {
+            return ResponseEntity.badRequest().body(ApiResponse.error("景点名称不能为空"));
+        }
+        if (request.getAddress() == null || request.getAddress().isBlank()) {
+            return ResponseEntity.badRequest().body(ApiResponse.error("景点地点不能为空"));
+        }
+        try {
+            String id = landscapeService.createLandscape(
+                    userId,
+                    request.getTitle().trim(),
+                    request.getContent() != null ? request.getContent().trim() : "",
+                    request.getAddress().trim(),
+                    request.getLatitude(),
+                    request.getLongitude(),
+                    request.resolveTel(),
+                    request.getOpeningTime(),
+                    request.getLevel(),
+                    null);
+            return landscapeService.findById(id)
+                    .map(l -> ResponseEntity.ok(ApiResponse.success(l)))
+                    .orElse(ResponseEntity.ok(ApiResponse.error("创建成功但查询失败")));
+        } catch (IOException e) {
+            return ResponseEntity.status(500).body(ApiResponse.error(500, "发布失败"));
+        }
+    }
+
+    // 发布景点（含图片，multipart）
+    @PostMapping(value = "/landscapes", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<ApiResponse<Landscape>> createLandscapeMultipart(
+            @RequestHeader(value = "X-User-Id", required = false) String userId,
+            @RequestParam String title,
+            @RequestParam String address,
+            @RequestParam(required = false) String content,
+            @RequestParam(required = false) Double latitude,
+            @RequestParam(required = false) Double longitude,
+            @RequestParam(required = false) String tel,
+            @RequestParam(required = false) String openingTime,
+            @RequestParam(required = false) String level,
+            @RequestPart(value = "image", required = false) MultipartFile image) {
+        if (userId == null || userId.isBlank()) {
+            return ResponseEntity.status(401).body(ApiResponse.error(401, "用户未登录"));
+        }
+        if (title == null || title.isBlank()) {
+            return ResponseEntity.badRequest().body(ApiResponse.error("景点名称不能为空"));
+        }
+        if (address == null || address.isBlank()) {
+            return ResponseEntity.badRequest().body(ApiResponse.error("景点地点不能为空"));
+        }
+        try {
+            String id = landscapeService.createLandscape(
+                    userId, title.trim(),
+                    content != null ? content.trim() : "",
+                    address.trim(), latitude, longitude, tel, openingTime, level, image);
+            return landscapeService.findById(id)
+                    .map(l -> ResponseEntity.ok(ApiResponse.success(l)))
+                    .orElse(ResponseEntity.ok(ApiResponse.error("创建成功但查询失败")));
+        } catch (IOException e) {
+            return ResponseEntity.status(500).body(ApiResponse.error(500, "发布失败"));
+        }
     }
 
     // 景点详情

@@ -35,11 +35,12 @@
                 </div>
                 
                 <div class="form-group">
-                    <label class="form-label">关联景点</label>
-                    <select class="form-input" name="landscapeId">
-                        <option value="">请选择关联景点（可选）</option>
+                    <label class="form-label">关联景点 <span style="color: #dc3545;">*</span></label>
+                    <select class="form-input" name="landscapeId" required>
+                        <option value="">请选择关联景点</option>
                         <option th:each="landscape : ${landscapes}" th:value="${landscape.landscapeId}" th:text="${landscape.title}"></option>
                     </select>
+                    <div th:if="${msg}" th:class="${msg.startsWith('关联景点') ? 'error-message' : ''}" th:text="${msg.startsWith('关联景点') ? msg : ''}"></div>
                 </div>
                 
                 <div class="form-group">
