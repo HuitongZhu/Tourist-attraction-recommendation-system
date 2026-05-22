@@ -1,0 +1,156 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="com.example.travel">
+
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
+    
+    <application
+        android:name=".TravelApplication"
+        android:allowBackup="true"
+        android:fullBackupContent="@xml/backup_rules"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.Travel"
+        android:usesCleartextTraffic="true">
+        
+        <!-- 高德地图 API Key -->
+        <meta-data
+            android:name="com.amap.api.v2.apikey"
+            android:value="a606d2a7fb6b778da9fe22430445a3f1" />
+        
+        <!-- 高德地图定位服务 -->
+        <service android:name="com.amap.api.location.APSService" />
+
+        <!-- 1. 登录页：作为APP启动页 -->
+        <activity
+            android:name=".LoginActivity"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <!-- 2. 注册页 -->
+        <activity android:name=".RegisterActivity" android:exported="false" />
+
+        <!-- 3. 首页 -->
+        <activity android:name=".HomeActivity" android:exported="false" />
+
+        <!-- 4. 推荐帖页 -->
+        <activity android:name=".RecommendPostActivity" android:exported="false" />
+
+        <!-- 5. 个人主页 -->
+        <activity
+            android:name=".PersonalHomeActivity"
+            android:exported="false" />
+
+        <!-- 6. 修改密码页 (原密码验证) -->
+        <activity
+            android:name=".ChangePasswordActivity"
+            android:exported="false" />
+
+        <!-- 7. 修改密码页 (手机号验证) -->
+        <activity
+            android:name=".MobileVerifyPasswordActivity"
+            android:exported="false" />
+
+        <!-- 8. 修改手机号页 (密码验证) -->
+        <activity
+            android:name=".ChangePhoneActivity"
+            android:exported="false" />
+
+        <!-- 9. 修改手机号页 (原手机号验证) -->
+        <activity
+            android:name=".MobileVerifyPhoneActivity"
+            android:exported="false" />
+
+        <!-- 10. 查看个人信息页 -->
+        <activity
+            android:name=".ViewProfileActivity"
+            android:exported="false" />
+
+        <!-- 10b. 编辑个人信息页 -->
+        <activity
+            android:name=".EditProfileActivity"
+            android:exported="false" />
+
+        <!-- 11. 忘记密码页 -->
+        <activity
+            android:name=".ForgotPasswordActivity"
+            android:exported="false" />
+
+        <!-- 12. 管理员后台 -->
+        <activity
+            android:name=".AdminActivity"
+            android:exported="false" />
+
+        <!-- 13. 审核景点信息 -->
+        <activity
+            android:name=".ScenicReviewActivity"
+            android:exported="false" />
+
+        <!-- 14. 审核推荐帖 -->
+        <activity
+            android:name=".PostReviewActivity"
+            android:exported="false" />
+
+        <!-- 15. 发布景点信息 -->
+        <activity
+            android:name=".PublishScenicInfoActivity"
+            android:exported="false" />
+
+        <!-- 16. 发布推荐帖 -->
+        <activity
+            android:name=".PublishPostActivity"
+            android:exported="false" />
+
+        <!-- 17. 推荐帖搜索 -->
+        <activity
+            android:name=".PostSearchActivity"
+            android:exported="false" />
+
+        <!-- 18. 景点详情页 -->
+        <activity
+            android:name=".ScenicDetailActivity"
+            android:exported="false" />
+
+        <!-- 19. 推荐帖详情页 -->
+        <activity
+            android:name=".PostDetailActivity"
+            android:exported="false" />
+
+        <!-- 20. 我的点赞/收藏列表 -->
+        <activity
+            android:name=".MyInteractionListActivity"
+            android:exported="false" />
+
+        <!-- 21. 我的景点信息 -->
+        <activity
+            android:name=".MyScenicManagementActivity"
+            android:exported="false" />
+
+        <!-- 22. 编辑景点 -->
+        <activity
+            android:name=".EditScenicActivity"
+            android:exported="false" />
+
+        <!-- 23. 我的推荐帖 -->
+        <activity
+            android:name=".MyPostsActivity"
+            android:exported="false" />
+
+        <!-- 24. 审核评论 -->
+        <activity
+            android:name=".CommentReviewActivity"
+            android:exported="false" />
+            
+    </application>
+
+</manifest>

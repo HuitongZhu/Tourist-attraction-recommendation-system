@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="zh-CN" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8"/>
+    <title>修改个人信息</title>
+    <link rel="stylesheet" th:href="@{/css/app.css}"/>
+</head>
+<body>
+<div th:replace="~{fragments :: navbar(${navKey})}"></div>
+<div class="page-wrap">
+    <div class="card" style="max-width:640px;margin:20px auto">
+        <h2 style="margin-top:0">修改个人信息</h2>
+        <form th:action="@{/user/profile/edit}" method="post">
+            <div class="form-row">
+                <label>真实姓名</label>
+                <input class="layui-input" name="realName" th:value="${profile.realName}"/>
+            </div>
+            <div class="form-row">
+                <label>联系电话</label>
+                <input class="layui-input" name="phoneNumber" th:value="${profile.phoneNumber}"/>
+            </div>
+            <div class="form-row">
+                <label>身份证号</label>
+                <input class="layui-input" name="idNumber" th:value="${profile.idNumber}"/>
+            </div>
+            <div class="form-row">
+                <label>性别</label>
+                <select class="layui-select" name="gender" style="height:38px;width:100%">
+                    <option value="">未填写</option>
+                    <option value="男" th:selected="${profile.gender == '男'}">男</option>
+                    <option value="女" th:selected="${profile.gender == '女'}">女</option>
+                </select>
+            </div>
+            <div class="form-row">
+                <label>生日</label>
+                <input class="layui-input" name="birthday" th:value="${profile.birthday}" placeholder="如 1997-08-09"/>
+            </div>
+            <button type="submit" class="btn btn-primary">保存</button>
+            <a class="btn btn-outline" th:href="@{/user/profile}" style="margin-left:10px">返回</a>
+        </form>
+    </div>
+</div>
+<div th:replace="~{fragments :: footer}"></div>
+</body>
+</html>

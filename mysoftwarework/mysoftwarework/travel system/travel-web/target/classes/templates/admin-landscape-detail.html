@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="zh-CN" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8"/>
+    <title th:text="${landscape.title}">景点详情</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/layui@2.8.18/dist/css/layui.css"/>
+    <link rel="stylesheet" th:href="@{/css/app.css}"/>
+    <script type="text/javascript" src="https://webapi.amap.com/maps?v=1.4.15&key=ee7b7be648faf8d9200c001ecab389b0"></script>
+    <style>
+        .layout { display: flex; gap: 28px; margin-top: 16px; }
+        .main { flex: 3; }
+        .side { flex: 1; min-width: 260px; }
+        .hero { width: 100%; height: 360px; border-radius: 8px; overflow: hidden; margin-bottom: 16px; }
+        .hero img { width: 100%; height: 100%; object-fit: cover; }
+        .meta { display: flex; flex-wrap: wrap; gap: 16px; font-size: 14px; color: #6c757d; margin: 12px 0; }
+        .content { white-space: pre-wrap; line-height: 1.8; color: #333; }
+        .actions { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; }
+        .comment { border-bottom: 1px solid #f0f0f0; padding: 14px 0; }
+        .comment:last-child { border-bottom: none; }
+        .related { display: flex; gap: 10px; padding: 8px 0; cursor: pointer; text-decoration: none; color: inherit; }
+        .related:hover { background: #f8f9fa; }
+        .top-nav-admin {
+            background-color: #fff;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 999;
+        }
+        .nav-container-admin {
+            width: 1200px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            height: 60px;
+        }
+        .nav-logo-admin {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .nav-logo-admin .logo-text {
+            font-size: 18px;
+            font-weight: bold;
+            color: #1a56db;
+        }
+        .nav-user-admin {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+        .nav-link-admin {
+            text-decoration: none;
+            color: #1a56db;
+            font-size: 14px;
+            font-weight: 500;
+        }
+        .nav-btn-admin {
+            padding: 6px 14px;
+            border-radius: 4px;
+            font-size: 12px;
+            cursor: pointer;
+            border: none;
+            background-color: #fff;
+            color: #1a56db;
+            border: 1px solid #1a56db;
+            text-decoration: none;
+        }
+        .nav-btn-admin:hover {
+            background-color: #1a56db;
+            color: #fff;
+        }
+        .back-btn {
+            background-color: #1a56db;
+            color: white;
+            padding: 6px 14px;
+            border-radius: 4px;
+            text-decoration: none;
+            font-size: 12px;
+            margin-bottom: 16px;
+            display: inline-block;
+            border: none;
+        }
+        .back-btn:hover {
+            opacity: 0.9;
+        }
+        .page-wrap {
+            padding-top: 80px;
+        }
+        .comment-delete-btn {
+            background-color: #ff4d4f;
+            color: white;
+            border: none;
+            padding: 4px 10px;
+            border-radius: 4px;
+            font-size: 12px;
+            cursor: pointer;
+        }
+        .comment-delete-btn:hover {
+            background-color: #ff7875;
+        }
+        .map-container { width: 100%; height: 300px; border-radius: 8px; margin-bottom: 16px; }
+    </style>
+</head>
+<body>
+<header class="top-nav-admin">
+    <div class="nav-container-admin">
+        <div class="nav-logo-admin">
+            <span class="logo-text">旅游景点推荐系统</span>
+        </div>
+        <div class="nav-user-admin">
+            <a href="/admin" class="nav-link-admin">管理员中心</a>
+            <a href="/logout" class="nav-btn-admin">退出登录</a>
+        </div>
+    </div>
+</header>
+<div class="page-wrap">
+    <button onclick="history.back()" class="back-btn">← 返回管理员中心</button>
+    <div th:if="${msg}" class="alert alert-info" th:text="${msg}"></div>
+    <div th:if="${error}" class="alert alert-error" th:text="${error}"></div>
+    <div class="layout">
+        <div class="main">
+            <div class="card">
+                <h1 style="margin:0 0 12px;font-size:24px" th:text="${landscape.title}">标题</h1>
+                <div class="hero">
+                    <img th:if="${landscape.imagePath != null}" th:src="${landscape.imagePath}" th:alt="${landscape.title}"/>
+                    <img th:unless="${landscape.imagePath != null}" th:src="@{'https://picsum.photos/seed/' + ${landscape.landscapeId} + '/1200/600'}" th:alt="${landscape.title}"/>
+                </div>
+                <div class="meta">
+                    <span th:text="'地址：' + ${landscape.address}">地址</span>
+                    <span th:text="'等级：' + ${landscape.level}">等级</span>
+                    <span th:text="'开放：' + ${landscape.openingTime}">开放</span>
+                    <span th:text="'电话：' + ${landscape.landscapeTel}">电话</span>
+                    <span th:text="'发布：' + ${#temporals.format(landscape.publishTime, 'yyyy-MM-dd HH:mm')}">时间</span>
+                </div>
+                <h3 style="color:#1a56db">景点位置</h3>
+                <div id="map-container" class="map-container"></div>
+                <h3 style="color:#1a56db">景点介绍</h3>
+                <div class="content" th:text="${landscape.content}">内容</div>
+            </div>
+            <div class="card">
+                <h3 style="margin-top:0">游客评论（<span th:text="${#lists.size(comments)}">0</span>）</h3>
+                <div class="comment" th:each="c : ${comments}">
+                    <div style="display:flex;justify-content:space-between;font-size:13px">
+                        <strong th:text="${c.userName}">用户</strong>
+                        <div style="display:flex;align-items:center;gap:10px">
+                            <span class="muted" th:text="${#temporals.format(c.publishTime, 'yyyy-MM-dd HH:mm')}">时间</span>
+                            <button class="comment-delete-btn" th:attr="onclick=|deleteLandComment('${c.commentId}')|">删除</button>
+                        </div>
+                    </div>
+                    <p style="margin:8px 0 0" th:text="${c.content}">内容</p>
+                </div>
+            </div>
+        </div>
+        <div class="side">
+            <div class="card">
+                <h3 style="margin-top:0">相关推荐</h3>
+                <a class="related" th:each="r : ${related}" th:href="@{/admin/landscapes/detail/{id}(id=${r.landscapeId})}">
+                    <img width="72" height="48" style="border-radius:4px;object-fit:cover"
+                         th:src="@{'https://picsum.photos/seed/' + ${r.landscapeId} + '/160/100'}"/>
+                    <div>
+                        <div style="font-size:14px" th:text="${r.title}">名称</div>
+                        <div class="muted" style="font-size:12px" th:text="${r.level}">等级</div>
+                    </div>
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+<script src="https://cdn.staticfile.org/layui/2.9.10/layui.js"></script>
+<script>
+    function deleteLandComment(commentId) {
+        layer.confirm('确定删除该评论？', {
+            btn: ['确定', '取消']
+        }, function(index) {
+            layer.close(index);
+            var xhr = new XMLHttpRequest();
+            xhr.open('POST', '/admin/landcomments/delete');
+            xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+            xhr.onload = function() {
+                if (xhr.responseText === 'success') {
+                    layer.msg('删除成功', {icon: 1});
+                    setTimeout(function() {
+                        location.reload();
+                    }, 1500);
+                } else {
+                    layer.msg('删除失败', {icon: 2});
+                }
+            };
+            xhr.send('id=' + commentId);
+        });
+    }
+
+    function initMap() {
+        var latitude = [[${landscape.latitude}]];
+        var longitude = [[${landscape.longitude}]];
+        var title = "[[${landscape.title}]]";
+        var address = "[[${landscape.address}]]";
+        
+        if (latitude && longitude && !isNaN(latitude) && !isNaN(longitude)) {
+            var map = new AMap.Map('map-container', {
+                resizeEnable: true,
+                zoom: 15,
+                center: [longitude, latitude]
+            });
+            
+            var marker = new AMap.Marker({
+                position: [longitude, latitude],
+                title: title,
+                icon: new AMap.Icon({
+                    size: new AMap.Size(40, 50),
+                    image: 'https://webapi.amap.com/theme/v1.3/markers/n/mark_b.png',
+                    imageSize: new AMap.Size(40, 50)
+                })
+            });
+            
+            map.add(marker);
+            
+            var infoWindow = new AMap.InfoWindow({
+                content: '<div style="padding:10px;">' +
+                         '<h4 style="margin:0 0 8px;color:#1a56db;">' + title + '</h4>' +
+                         '<p style="margin:0;font-size:14px;">地址：' + address + '</p>' +
+                         '</div>',
+                offset: new AMap.Pixel(0, -20)
+            });
+            
+            marker.on('click', function() {
+                infoWindow.open(map, marker.getPosition());
+            });
+            
+            infoWindow.open(map, marker.getPosition());
+        } else {
+            document.getElementById('map-container').innerHTML = '<div style="padding:40px 12px;background:#f8f9fa;border-radius:6px;text-align:center;color:#6c757d;height:220px;display:flex;align-items:center;justify-content:center;">暂无地图坐标信息</div>';
+        }
+    }
+
+    window.onload = initMap;
+</script>
+</body>
+</html>
