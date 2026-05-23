@@ -82,6 +82,7 @@ public class LandscapeController {
         }
         model.addAttribute("landscape", l);
         model.addAttribute("likeCount", landscapeService.likeCount(id));
+        model.addAttribute("collectCount", landscapeService.collectCount(id));
         model.addAttribute("comments", landCommentService.listForLandscape(id));
         model.addAttribute("related", landscapeService.related(l.getAddress(), id, 4));
         model.addAttribute("pendingAudit", !approved);
@@ -101,6 +102,7 @@ public class LandscapeController {
         Landscape l = raw.get();
         model.addAttribute("landscape", l);
         model.addAttribute("likeCount", landscapeService.likeCount(id));
+        model.addAttribute("collectCount", landscapeService.collectCount(id));
         model.addAttribute("comments", landCommentService.listForLandscape(id));
         model.addAttribute("related", landscapeService.related(l.getAddress(), id, 4));
         return "admin-landscape-detail";

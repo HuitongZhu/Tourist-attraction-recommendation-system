@@ -16,6 +16,7 @@ public class LandscapeResponse {
     private String auditState;
     private LocalDateTime publishTime;
     private long likeCount;
+    private long favoriteCount;
     private long commentCount;
 
     public LandscapeResponse() {}
@@ -46,6 +47,8 @@ public class LandscapeResponse {
     public void setPublishTime(LocalDateTime publishTime) { this.publishTime = publishTime; }
     public long getLikeCount() { return likeCount; }
     public void setLikeCount(long likeCount) { this.likeCount = likeCount; }
+    public long getFavoriteCount() { return favoriteCount; }
+    public void setFavoriteCount(long favoriteCount) { this.favoriteCount = favoriteCount; }
     public long getCommentCount() { return commentCount; }
     public void setCommentCount(long commentCount) { this.commentCount = commentCount; }
 }

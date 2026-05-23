@@ -28,4 +28,7 @@ public interface LandCollectRepository extends JpaRepository<LandCollect, String
     // 5. 用于删除景点时清理关联的收藏记录
     @Transactional
     void deleteByLandscapeId(String landscapeId);
+
+    // 6. 用于统计景点的收藏个数
+    long countByLandscapeId(String landscapeId);
 }

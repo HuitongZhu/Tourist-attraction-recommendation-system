@@ -74,4 +74,24 @@ public class AmapService {
         
         return result;
     }
+
+    /** 服务端拉取高德静态地图 PNG，供 App 通过 HTTP 代理访问（避免模拟器/真机直连高德 HTTPS 的 SSL 问题） */
+    public byte[] fetchStaticMapImage(double latitude, double longitude) {
+        String url = String.format(
+                "https://restapi.amap.com/v3/staticmap?location=%s,%s&zoom=15&size=750%%2A300&scale=2"
+                        + "&markers=mid,,A:%s,%s&key=%s",
+                longitude, latitude, longitude, latitude, API_KEY);
+        try {
+            logger.info("拉取静态地图: lat={}, lng={}", latitude, longitude);
+            byte[] body = restTemplate.getForObject(url, byte[].class);
+            if (body == null || body.length < 64) {
+                logger.warn("静态地图响应过小: {}", body == null ? 0 : body.length);
+                return null;
+            }
+            return body;
+        } catch (Exception e) {
+            logger.error("拉取静态地图失败", e);
+            return null;
+        }
+    }
 }

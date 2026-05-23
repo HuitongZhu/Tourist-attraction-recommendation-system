@@ -95,4 +95,49 @@ public class RegisterApiController {
         return ResponseEntity.ok(ApiResponse.success(
                 new UsernameCheckResponse(true, "手机号可用")));
     }
+
+    /** 验证注册验证码（验证码错误时 success=false） */
+    @PostMapping(value = "/verify-code", consumes = MediaType.APPLICATION_FORM_URLENCODED_VALUE)
+    public ResponseEntity<ApiResponse<Boolean>> verifyRegisterCode(
+            @RequestParam("phone") String phone,
+            @RequestParam("code") String code) {
+        try {
+            boolean valid = authService.verifyRegisterCode(phone, code);
+            if (!valid) {
+                return ResponseEntity.ok(ApiResponse.error("验证码错误或已过期"));
+            }
+            return ResponseEntity.ok(ApiResponse.success(true));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.ok(ApiResponse.error(e.getMessage()));
+        }
+    }
+
+    /**
+     * 提交注册（必须先通过短信验证码校验）
+     * 供安卓端使用，替代未校验验证码的 /api/register
+     */
+    @PostMapping(value = "/submit", consumes = MediaType.APPLICATION_FORM_URLENCODED_VALUE)
+    public ResponseEntity<ApiResponse<String>> registerWithCode(
+            @RequestParam("userName") String userName,
+            @RequestParam("account") String account,
+            @RequestParam("password") String password,
+            @RequestParam("confirm_password") String confirmPassword,
+            @RequestParam("code") String code) {
+        if (!password.equals(confirmPassword)) {
+            return ResponseEntity.ok(ApiResponse.error("两次输入的密码不一致"));
+        }
+        if (code == null || code.isBlank()) {
+            return ResponseEntity.ok(ApiResponse.error("请输入验证码"));
+        }
+        try {
+            boolean valid = authService.verifyRegisterCode(account.trim(), code.trim());
+            if (!valid) {
+                return ResponseEntity.ok(ApiResponse.error("验证码错误或已过期"));
+            }
+            String userId = authService.register(userName.trim(), account.trim(), password);
+            return ResponseEntity.ok(ApiResponse.success(userId));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.ok(ApiResponse.error(e.getMessage()));
+        }
+    }
 }

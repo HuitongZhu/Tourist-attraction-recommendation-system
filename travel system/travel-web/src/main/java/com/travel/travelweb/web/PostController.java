@@ -125,6 +125,7 @@ public class PostController {
             model.addAttribute("collected", postInteractionService.collected(id, userId));
         }
         model.addAttribute("likeCount", postInteractionService.likeCount(id));
+        model.addAttribute("collectCount", postInteractionService.collectCount(id));
         return "post-detail";
     }
 

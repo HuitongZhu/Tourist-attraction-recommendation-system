@@ -12,12 +12,6 @@ import java.util.Optional;
 @Service
 public class UserProfileService {
 
-    private static final int CODE_LENGTH = 6;
-    private static final int CODE_EXPIRE_MINUTES = 5;
-    
-    private final java.util.concurrent.ConcurrentHashMap<String, CodeInfo> deleteCodeCache = new java.util.concurrent.ConcurrentHashMap<>();
-    private final java.util.concurrent.ConcurrentHashMap<String, CodeInfo> passwordCodeCache = new java.util.concurrent.ConcurrentHashMap<>();
-    
     private final SysUserRepository sysUserRepository;
     private final OrdinaryUserRepository ordinaryUserRepository;
     private final LandCollectRepository landCollectRepository;
@@ -27,6 +21,8 @@ public class UserProfileService {
     private final PostCommentRepository postCommentRepository;
     private final RecommendationPostRepository recommendationPostRepository;
     private final PasswordEncoder passwordEncoder;
+    private final AliyunSmsService aliyunSmsService;
+    private final SmsCodeCacheService smsCodeCacheService;
 
     public UserProfileService(SysUserRepository sysUserRepository, 
                              OrdinaryUserRepository ordinaryUserRepository,
@@ -36,7 +32,9 @@ public class UserProfileService {
                              LandscapeRepository landscapeRepository,
                              PostCommentRepository postCommentRepository,
                              RecommendationPostRepository recommendationPostRepository,
-                             PasswordEncoder passwordEncoder) {
+                             PasswordEncoder passwordEncoder,
+                             AliyunSmsService aliyunSmsService,
+                             SmsCodeCacheService smsCodeCacheService) {
         this.sysUserRepository = sysUserRepository;
         this.ordinaryUserRepository = ordinaryUserRepository;
         this.landCollectRepository = landCollectRepository;
@@ -46,6 +44,8 @@ public class UserProfileService {
         this.postCommentRepository = postCommentRepository;
         this.recommendationPostRepository = recommendationPostRepository;
         this.passwordEncoder = passwordEncoder;
+        this.aliyunSmsService = aliyunSmsService;
+        this.smsCodeCacheService = smsCodeCacheService;
     }
 
     public record Profile(
@@ -143,39 +143,17 @@ public class UserProfileService {
         } else if ("sms".equals(verifyType)) {
             OrdinaryUser ou = ordinaryUserRepository.findById(userId).orElse(null);
             if (ou == null || ou.getPhoneNumber() == null) {
-                System.out.println("用户未绑定手机号");
                 throw new IllegalArgumentException("未绑定手机号");
             }
             String phone = ou.getPhoneNumber();
-            System.out.println("用户手机号: " + phone);
-            CodeInfo codeInfo = passwordCodeCache.get(phone);
-            
-            if (codeInfo == null) {
-                System.out.println("验证码未找到，可能未发送或已过期");
-                throw new IllegalArgumentException("请先获取验证码");
-            }
-            
-            if (codeInfo.expireTime.isBefore(java.time.LocalDateTime.now())) {
-                passwordCodeCache.remove(phone);
-                System.out.println("验证码已过期");
-                throw new IllegalArgumentException("验证码已过期，请重新获取");
-            }
-            
-            System.out.println("输入验证码: [" + verifyValue + "], 数据库验证码: [" + codeInfo.code + "]");
             if (verifyValue == null || verifyValue.trim().isEmpty()) {
-                System.out.println("验证码输入为空");
                 throw new IllegalArgumentException("请输入验证码");
             }
-            if (!verifyValue.trim().equals(codeInfo.code)) {
-                System.out.println("验证码不匹配");
-                throw new IllegalArgumentException("验证码不正确");
+            if (!verifySmsCode(phone, verifyValue.trim(), SmsCodeType.PASSWORD)) {
+                throw new IllegalArgumentException("验证码不正确或已过期");
             }
-            
-            passwordCodeCache.remove(phone);
-            
             u.setUserPassword(passwordEncoder.encode(newPwd.trim()));
             sysUserRepository.save(u);
-            System.out.println("验证码验证通过，修改成功");
         } else {
             System.out.println("未知的验证类型: " + verifyType);
             throw new IllegalArgumentException("请选择验证方式");
@@ -183,7 +161,7 @@ public class UserProfileService {
         System.out.println("==================================");
     }
 
-    public String sendPasswordCode(String phoneNumber) {
+    public void sendPasswordCode(String phoneNumber) {
         if (phoneNumber == null || phoneNumber.isBlank()) {
             throw new IllegalArgumentException("手机号不能为空");
         }
@@ -191,22 +169,7 @@ public class UserProfileService {
         if (!phone.matches("^1\\d{10}$")) {
             throw new IllegalArgumentException("请输入正确的手机号格式");
         }
-        
-        CodeInfo existing = passwordCodeCache.get(phone);
-        if (existing != null && existing.sendTime.plusSeconds(60).isAfter(java.time.LocalDateTime.now())) {
-            throw new IllegalArgumentException("验证码发送过于频繁，请稍后再试");
-        }
-        
-        String code = generateCode();
-        java.time.LocalDateTime now = java.time.LocalDateTime.now();
-        passwordCodeCache.put(phone, new CodeInfo(code, now, now.plusMinutes(CODE_EXPIRE_MINUTES)));
-        
-        System.out.println("========== 修改密码验证码 ==========");
-        System.out.println("手机号: " + phone);
-        System.out.println("验证码: " + code);
-        System.out.println("有效期: " + CODE_EXPIRE_MINUTES + "分钟");
-        System.out.println("==================================");
-        return code;
+        sendAliyunCode(phone, SmsCodeType.PASSWORD);
     }
 
     @Transactional
@@ -236,7 +199,7 @@ public class UserProfileService {
         return ou.getPhoneNumber();
     }
 
-    public String sendDeleteCode(String phoneNumber) {
+    public void sendDeleteCode(String phoneNumber) {
         if (phoneNumber == null || phoneNumber.isBlank()) {
             throw new IllegalArgumentException("手机号不能为空");
         }
@@ -244,22 +207,7 @@ public class UserProfileService {
         if (!phone.matches("^1\\d{10}$")) {
             throw new IllegalArgumentException("请输入正确的手机号格式");
         }
-        
-        CodeInfo existing = deleteCodeCache.get(phone);
-        if (existing != null && existing.sendTime.plusSeconds(60).isAfter(java.time.LocalDateTime.now())) {
-            throw new IllegalArgumentException("验证码发送过于频繁，请稍后再试");
-        }
-        
-        String code = generateCode();
-        java.time.LocalDateTime now = java.time.LocalDateTime.now();
-        deleteCodeCache.put(phone, new CodeInfo(code, now, now.plusMinutes(CODE_EXPIRE_MINUTES)));
-        
-        System.out.println("========== 注销验证码 ==========");
-        System.out.println("手机号: " + phone);
-        System.out.println("验证码: " + code);
-        System.out.println("有效期: " + CODE_EXPIRE_MINUTES + "分钟");
-        System.out.println("=================================");
-        return code;
+        sendAliyunCode(phone, SmsCodeType.DELETE);
     }
 
     public boolean verifyAndDelete(String userId, String type, String value) {
@@ -275,47 +223,28 @@ public class UserProfileService {
             if (ou == null || ou.getPhoneNumber() == null) {
                 return false;
             }
-            String phone = ou.getPhoneNumber();
-            CodeInfo codeInfo = deleteCodeCache.get(phone);
-            
-            if (codeInfo == null) {
-                return false;
-            }
-            
-            if (codeInfo.expireTime.isBefore(java.time.LocalDateTime.now())) {
-                deleteCodeCache.remove(phone);
-                return false;
-            }
-            
-            boolean valid = value.equals(codeInfo.code);
-            if (valid) {
-                deleteCodeCache.remove(phone);
-            }
-            return valid;
+            return verifySmsCode(ou.getPhoneNumber(), value, SmsCodeType.DELETE);
         }
         
         return false;
     }
-    
-    private String generateCode() {
-        java.util.Random random = new java.util.Random();
-        StringBuilder sb = new StringBuilder();
-        for (int i = 0; i < CODE_LENGTH; i++) {
-            sb.append(random.nextInt(10));
-        }
-        return sb.toString();
-    }
-    
-    private static class CodeInfo {
-        String code;
-        java.time.LocalDateTime sendTime;
-        java.time.LocalDateTime expireTime;
 
-        CodeInfo(String code, java.time.LocalDateTime sendTime, java.time.LocalDateTime expireTime) {
-            this.code = code;
-            this.sendTime = sendTime;
-            this.expireTime = expireTime;
+    private void sendAliyunCode(String phone, SmsCodeType type) {
+        smsCodeCacheService.checkSendInterval(phone, type);
+        String outId = aliyunSmsService.sendVerifyCode(phone);
+        smsCodeCacheService.saveSession(phone, type, outId);
+    }
+
+    private boolean verifySmsCode(String phone, String code, SmsCodeType type) {
+        String outId = smsCodeCacheService.getOutId(phone, type);
+        if (outId == null) {
+            return false;
         }
+        boolean passed = aliyunSmsService.checkVerifyCode(phone, code, outId);
+        if (passed) {
+            smsCodeCacheService.removeSession(phone, type);
+        }
+        return passed;
     }
 
     private static String emptyToNull(String s) {

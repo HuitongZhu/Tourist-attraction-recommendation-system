@@ -272,7 +272,7 @@
             .then(response => response.json())
             .then(data => {
                 if (data.success) {
-                    alert('验证码: ' + data.code);
+                    alert('验证码已发送，请查收短信');
                     var count = 60;
                     btn.textContent = count + '秒后重发';
                     var timer = setInterval(function() {

@@ -22,13 +22,13 @@ public final class SmsSendSupport {
         if (!normalized.matches("^1\\d{10}$")) {
             throw new IllegalArgumentException("请输入正确的11位手机号");
         }
-        String code = switch (type == null ? "" : type.toLowerCase()) {
+        switch (type == null ? "" : type.toLowerCase()) {
             case "register" -> authService.sendRegisterSmsCode(normalized);
             case "password" -> userProfileService.sendPasswordCode(normalized);
             case "delete" -> userProfileService.sendDeleteCode(normalized);
             case "forgot", "login" -> authService.sendSmsCode(normalized);
             default -> authService.sendSmsCode(normalized);
-        };
-        return new SmsCodeResponse(normalized, code, EXPIRE_SECONDS);
+        }
+        return new SmsCodeResponse(normalized, null, EXPIRE_SECONDS);
     }
 }

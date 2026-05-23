@@ -21,18 +21,22 @@ public class AmapController {
     @GetMapping("/api/amap/geocode")
     public Map<String, Object> geocode(@RequestParam String address) {
         Map<String, Object> response = new HashMap<>();
-        
-        Map<String, Double> coords = amapService.getCoordinates(address);
-        
-        if (coords.containsKey("latitude") && coords.containsKey("longitude")) {
-            response.put("success", true);
-            response.put("latitude", coords.get("latitude"));
-            response.put("longitude", coords.get("longitude"));
-        } else {
+        try {
+            Map<String, Double> coords = amapService.getCoordinates(address);
+            Double lat = coords.get("latitude");
+            Double lng = coords.get("longitude");
+            if (lat != null && lng != null) {
+                response.put("success", true);
+                response.put("latitude", lat);
+                response.put("longitude", lng);
+            } else {
+                response.put("success", false);
+                response.put("message", "无法获取坐标，请检查地址是否正确");
+            }
+        } catch (Exception e) {
             response.put("success", false);
-            response.put("message", "无法获取坐标，请检查地址是否正确");
+            response.put("message", "地理编码服务异常: " + e.getMessage());
         }
-        
         return response;
     }
 }

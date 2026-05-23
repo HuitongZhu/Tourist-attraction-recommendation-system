@@ -25,11 +25,18 @@ import com.travel.travelweb.api.dto.CommentRequest;
 import com.travel.travelweb.api.dto.CommentResponse;
 import com.travel.travelweb.api.dto.LandscapeRequest;
 import com.travel.travelweb.api.dto.PageResponse;
+import com.travel.travelweb.api.dto.PostBackendResponse;
 import com.travel.travelweb.entity.Landscape;
 import com.travel.travelweb.entity.RecommendationPost;
+import com.travel.travelweb.repo.LandscapeRepository;
+import com.travel.travelweb.repo.PostCollectRepository;
+import com.travel.travelweb.repo.PostCommentRepository;
+import com.travel.travelweb.repo.PostLikeRepository;
+import com.travel.travelweb.repo.SysUserRepository;
 import com.travel.travelweb.service.LandCommentService;
 import com.travel.travelweb.service.LandscapeService;
 import com.travel.travelweb.service.PostService;
+import com.travel.travelweb.service.RecommendationPostService;
 import com.travel.travelweb.web.dto.LandCommentView;
 import com.travel.travelweb.web.dto.PostCommentView;
 
@@ -40,17 +47,45 @@ public class ApiController {
     private final LandscapeService landscapeService;
     private final PostService postService;
     private final LandCommentService landCommentService;
+    private final RecommendationPostService recommendationPostService;
+    private final PostLikeRepository postLikeRepository;
+    private final PostCollectRepository postCollectRepository;
+    private final PostCommentRepository postCommentRepository;
+    private final LandscapeRepository landscapeRepository;
+    private final SysUserRepository sysUserRepository;
 
-    public ApiController(LandscapeService landscapeService, PostService postService, LandCommentService landCommentService) {
+    public ApiController(LandscapeService landscapeService, PostService postService, LandCommentService landCommentService,
+                         RecommendationPostService recommendationPostService,
+                         PostLikeRepository postLikeRepository, PostCollectRepository postCollectRepository,
+                         PostCommentRepository postCommentRepository, LandscapeRepository landscapeRepository,
+                         SysUserRepository sysUserRepository) {
         this.landscapeService = landscapeService;
         this.postService = postService;
         this.landCommentService = landCommentService;
+        this.recommendationPostService = recommendationPostService;
+        this.postLikeRepository = postLikeRepository;
+        this.postCollectRepository = postCollectRepository;
+        this.postCommentRepository = postCommentRepository;
+        this.landscapeRepository = landscapeRepository;
+        this.sysUserRepository = sysUserRepository;
     }
 
     // 首页景点数据
     @GetMapping("/landscapes/home")
-    public ResponseEntity<ApiResponse<List<Landscape>>> homeLandscapes() {
-        List<Landscape> landscapes = landscapeService.homeLandscapes(8);
+    public ResponseEntity<ApiResponse<List<Landscape>>> homeLandscapes(
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false, defaultValue = "8") int size) {
+        List<Landscape> landscapes;
+        // 如果指定了 status=审核通过，返回所有已审核景点（用于发布推荐帖关联）
+        if ("审核通过".equals(status)) {
+            landscapes = landscapeService.listApproved();
+        } else {
+            landscapes = landscapeService.homeLandscapes(size);
+        }
+        // 按size参数限制数量
+        if (size > 0 && landscapes.size() > size) {
+            landscapes = landscapes.subList(0, size);
+        }
         return ResponseEntity.ok(ApiResponse.success(landscapes));
     }
 
@@ -58,10 +93,22 @@ public class ApiController {
     @GetMapping("/landscapes")
     public ResponseEntity<ApiResponse<Map<String, Object>>> landscapes(
             @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) String status,
             @RequestParam(required = false, defaultValue = "all") String city,
             @RequestParam(required = false, defaultValue = "all") String level,
-            @RequestParam(required = false, defaultValue = "time") String sort) {
-        List<Landscape> landscapes = landscapeService.search(keyword, city, level, sort);
+            @RequestParam(required = false, defaultValue = "time") String sort,
+            @RequestParam(required = false, defaultValue = "10") int size) {
+        List<Landscape> landscapes;
+        // 如果指定了 status=审核通过，返回所有已审核景点（用于发布推荐帖关联）
+        if ("审核通过".equals(status) && (keyword == null || keyword.isBlank())) {
+            landscapes = landscapeService.listApproved();
+        } else {
+            landscapes = landscapeService.search(keyword, city, level, sort);
+        }
+        // 按size参数限制数量
+        if (size > 0 && landscapes.size() > size) {
+            landscapes = landscapes.subList(0, size);
+        }
         Map<String, Object> result = new HashMap<>();
         result.put("landscapes", landscapes);
         result.put("total", landscapes.size());
@@ -202,9 +249,19 @@ public class ApiController {
     // 推荐帖列表
     @GetMapping("/posts")
     public ResponseEntity<ApiResponse<Map<String, Object>>> posts(
+            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) String tag,
+            @RequestParam(required = false) String status,
             @RequestParam(required = false, defaultValue = "1") int page,
             @RequestParam(required = false, defaultValue = "10") int size) {
-        List<RecommendationPost> posts = postService.listApproved();
+        List<RecommendationPost> posts;
+        if (keyword != null && !keyword.isBlank()) {
+            // 搜索推荐帖，只返回审核通过的
+            posts = recommendationPostService.findPosts(RecommendationPostService.AUDIT_APPROVED, keyword);
+        } else {
+            // 获取所有审核通过的推荐帖
+            posts = postService.listApproved();
+        }
         Map<String, Object> result = new HashMap<>();
         result.put("posts", posts);
         result.put("total", posts.size());
@@ -213,16 +270,40 @@ public class ApiController {
 
     // 推荐帖详情
     @GetMapping("/posts/{id}")
-    public ResponseEntity<ApiResponse<RecommendationPost>> postDetail(@PathVariable String id) {
+    public ResponseEntity<ApiResponse<PostBackendResponse>> postDetail(@PathVariable String id) {
         return postService.findApproved(id)
+                .map(this::toPostResponse)
                 .map(post -> ResponseEntity.ok(ApiResponse.success(post)))
                 .orElse(ResponseEntity.status(404).body(ApiResponse.error("推荐帖不存在或未审核")));
     }
 
+    private PostBackendResponse toPostResponse(RecommendationPost p) {
+        PostBackendResponse r = new PostBackendResponse();
+        r.setRecomId(p.getRecomId());
+        r.setUserId(p.getUserId());
+        sysUserRepository.findById(p.getUserId()).map(u -> u.getUserName()).ifPresent(r::setUserName);
+        r.setTitle(p.getTitle());
+        r.setLandscapeId(p.getLandscapeId());
+        if (p.getLandscapeId() != null && !p.getLandscapeId().isBlank()) {
+            landscapeRepository.findById(p.getLandscapeId())
+                    .ifPresent(l -> r.setLandscapeTitle(l.getTitle()));
+        }
+        r.setTag(p.getTag());
+        r.setContent(p.getContent());
+        r.setAuditState(p.getAuditState());
+        r.setPublishTime(p.getPublishTime());
+        r.setLikeCount(postLikeRepository.countByRecomId(p.getRecomId()));
+        r.setCommentCount(postCommentRepository.findByRecomIdOrderByPublishTimeDesc(p.getRecomId()).size());
+        r.setFavoriteCount(postCollectRepository.countByRecomId(p.getRecomId()));
+        return r;
+    }
+
     // 首页推荐帖数据
     @GetMapping("/posts/home")
-    public ResponseEntity<ApiResponse<List<RecommendationPost>>> homePosts() {
-        List<RecommendationPost> posts = postService.homePosts(6);
+    public ResponseEntity<ApiResponse<List<PostBackendResponse>>> homePosts() {
+        List<PostBackendResponse> posts = postService.homePosts(6).stream()
+                .map(this::toPostResponse)
+                .toList();
         return ResponseEntity.ok(ApiResponse.success(posts));
     }
 

@@ -143,7 +143,7 @@ public class AppApiController {
     @PostMapping("/send-sms-code")
     public ResponseEntity<ApiResponse<String>> sendSms(@RequestParam String phone) {
         try {
-            String code = authService.sendSmsCode(phone);
+            authService.sendSmsCode(phone);
             return ResponseEntity.ok(ApiResponse.success("验证码已发送"));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.ok(ApiResponse.error(e.getMessage()));
@@ -153,7 +153,7 @@ public class AppApiController {
     @PostMapping("/register/send-code")
     public ResponseEntity<ApiResponse<String>> sendRegisterCode(@RequestParam String phone) {
         try {
-            String code = authService.sendRegisterSmsCode(phone);
+            authService.sendRegisterSmsCode(phone);
             return ResponseEntity.ok(ApiResponse.success("验证码已发送"));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.ok(ApiResponse.error(e.getMessage()));
@@ -269,6 +269,7 @@ public class AppApiController {
         response.setAuditState(l.getAuditState());
         response.setPublishTime(l.getPublishTime());
         response.setLikeCount(landLikeRepository.countByLandscapeId(l.getLandscapeId()));
+        response.setFavoriteCount(landCollectRepository.countByLandscapeId(l.getLandscapeId()));
         response.setCommentCount(landCommentRepository.findByLandscapeIdOrderByPublishTimeDesc(l.getLandscapeId()).size());
         return response;
     }
@@ -290,6 +291,7 @@ public class AppApiController {
         response.setPublishTime(l.getPublishTime());
         response.setAuditTime(l.getAuditTime());
         response.setLikeCount(landLikeRepository.countByLandscapeId(l.getLandscapeId()));
+        response.setFavoriteCount(landCollectRepository.countByLandscapeId(l.getLandscapeId()));
         response.setCommentCount(landCommentRepository.findByLandscapeIdOrderByPublishTimeDesc(l.getLandscapeId()).size());
         return response;
     }
@@ -638,8 +640,10 @@ public class AppApiController {
             Map<String, Double> result = amapService.getCoordinates(address);
             Double lat = result.get("latitude");
             Double lng = result.get("longitude");
-            GeocodeResponse response = new GeocodeResponse(lat, lng, address);
-            return ResponseEntity.ok(ApiResponse.success(response));
+            if (lat != null && lng != null) {
+                return ResponseEntity.ok(ApiResponse.success(new GeocodeResponse(lat, lng, address)));
+            }
+            return ResponseEntity.ok(ApiResponse.error("无法获取坐标，请检查地址是否正确"));
         } catch (Exception e) {
             return ResponseEntity.ok(ApiResponse.error(e.getMessage()));
         }

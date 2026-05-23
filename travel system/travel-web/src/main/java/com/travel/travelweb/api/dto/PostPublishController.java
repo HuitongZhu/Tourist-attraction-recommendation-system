@@ -1,8 +1,5 @@
 package com.travel.travelweb.api.dto;
 
-import java.util.List;
-import java.util.stream.Collectors;
-
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -21,6 +18,7 @@ import com.travel.travelweb.entity.Landscape;
 import com.travel.travelweb.entity.PostComment;
 import com.travel.travelweb.entity.RecommendationPost;
 import com.travel.travelweb.entity.SysUser;
+import com.travel.travelweb.repo.LandCollectRepository;
 import com.travel.travelweb.repo.LandCommentRepository;
 import com.travel.travelweb.repo.LandLikeRepository;
 import com.travel.travelweb.repo.LandscapeRepository;
@@ -32,6 +30,9 @@ import com.travel.travelweb.service.LandCommentService;
 import com.travel.travelweb.service.LandscapeService;
 import com.travel.travelweb.service.PostService;
 import com.travel.travelweb.service.UserProfileService;
+
+import java.util.List;
+import java.util.stream.Collectors;
 
 /**
  * 推荐帖发布相关 API（供安卓端使用）
@@ -45,6 +46,7 @@ public class PostPublishController {
     private final LandscapeRepository landscapeRepository;
     private final RecommendationPostRepository postRepository;
     private final LandLikeRepository landLikeRepository;
+    private final LandCollectRepository landCollectRepository;
     private final LandCommentService landCommentService;
     private final LandCommentRepository landCommentRepository;
     private final PostCommentRepository postCommentRepository;
@@ -58,6 +60,7 @@ public class PostPublishController {
             LandscapeRepository landscapeRepository,
             RecommendationPostRepository postRepository,
             LandLikeRepository landLikeRepository,
+            LandCollectRepository landCollectRepository,
             LandCommentService landCommentService,
             LandCommentRepository landCommentRepository,
             PostCommentRepository postCommentRepository,
@@ -69,6 +72,7 @@ public class PostPublishController {
         this.landscapeRepository = landscapeRepository;
         this.postRepository = postRepository;
         this.landLikeRepository = landLikeRepository;
+        this.landCollectRepository = landCollectRepository;
         this.landCommentService = landCommentService;
         this.landCommentRepository = landCommentRepository;
         this.postCommentRepository = postCommentRepository;
@@ -338,6 +342,7 @@ public class PostPublishController {
         r.setPublishTime(l.getPublishTime());
         r.setAuditTime(l.getAuditTime());
         r.setLikeCount(landLikeRepository.countByLandscapeId(l.getLandscapeId()));
+        r.setFavoriteCount(landCollectRepository.countByLandscapeId(l.getLandscapeId()));
         r.setCommentCount(landCommentRepository.findByLandscapeIdOrderByPublishTimeDesc(l.getLandscapeId()).size());
         return r;
     }

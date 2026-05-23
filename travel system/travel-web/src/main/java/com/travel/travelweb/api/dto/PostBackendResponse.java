@@ -15,6 +15,7 @@ public class PostBackendResponse {
     private LocalDateTime publishTime;
     private long likeCount;
     private long commentCount;
+    private long favoriteCount;
 
     public PostBackendResponse() {}
 
@@ -42,4 +43,6 @@ public class PostBackendResponse {
     public void setLikeCount(long likeCount) { this.likeCount = likeCount; }
     public long getCommentCount() { return commentCount; }
     public void setCommentCount(long commentCount) { this.commentCount = commentCount; }
+    public long getFavoriteCount() { return favoriteCount; }
+    public void setFavoriteCount(long favoriteCount) { this.favoriteCount = favoriteCount; }
 }

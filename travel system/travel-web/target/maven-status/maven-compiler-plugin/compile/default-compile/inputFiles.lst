@@ -37,8 +37,10 @@ D:\travel system\travel-web\src\main\java\com\travel\travelweb\api\dto\SmsCodeRe
 D:\travel system\travel-web\src\main\java\com\travel\travelweb\api\dto\SmsSendSupport.java
 D:\travel system\travel-web\src\main\java\com\travel\travelweb\api\dto\UpdateProfileRequest.java
 D:\travel system\travel-web\src\main\java\com\travel\travelweb\api\dto\UpdateUserInfoRequest.java
+D:\travel system\travel-web\src\main\java\com\travel\travelweb\api\dto\UserAccountApiController.java
 D:\travel system\travel-web\src\main\java\com\travel\travelweb\api\dto\UsernameCheckResponse.java
 D:\travel system\travel-web\src\main\java\com\travel\travelweb\api\dto\UserResponse.java
+D:\travel system\travel-web\src\main\java\com\travel\travelweb\config\AliyunSmsProperties.java
 D:\travel system\travel-web\src\main\java\com\travel\travelweb\config\LoginInterceptor.java
 D:\travel system\travel-web\src\main\java\com\travel\travelweb\config\PasswordConfig.java
 D:\travel system\travel-web\src\main\java\com\travel\travelweb\config\WebMvcConfig.java
@@ -64,6 +66,7 @@ D:\travel system\travel-web\src\main\java\com\travel\travelweb\repo\PostCommentR
 D:\travel system\travel-web\src\main\java\com\travel\travelweb\repo\PostLikeRepository.java
 D:\travel system\travel-web\src\main\java\com\travel\travelweb\repo\RecommendationPostRepository.java
 D:\travel system\travel-web\src\main\java\com\travel\travelweb\repo\SysUserRepository.java
+D:\travel system\travel-web\src\main\java\com\travel\travelweb\service\AliyunSmsService.java
 D:\travel system\travel-web\src\main\java\com\travel\travelweb\service\AmapService.java
 D:\travel system\travel-web\src\main\java\com\travel\travelweb\service\AuthService.java
 D:\travel system\travel-web\src\main\java\com\travel\travelweb\service\LandCommentService.java
@@ -73,6 +76,8 @@ D:\travel system\travel-web\src\main\java\com\travel\travelweb\service\LoginResu
 D:\travel system\travel-web\src\main\java\com\travel\travelweb\service\PostInteractionService.java
 D:\travel system\travel-web\src\main\java\com\travel\travelweb\service\PostService.java
 D:\travel system\travel-web\src\main\java\com\travel\travelweb\service\RecommendationPostService.java
+D:\travel system\travel-web\src\main\java\com\travel\travelweb\service\SmsCodeCacheService.java
+D:\travel system\travel-web\src\main\java\com\travel\travelweb\service\SmsCodeType.java
 D:\travel system\travel-web\src\main\java\com\travel\travelweb\service\UserProfileService.java
 D:\travel system\travel-web\src\main\java\com\travel\travelweb\service\UserService.java
 D:\travel system\travel-web\src\main\java\com\travel\travelweb\TravelWebApplication.java

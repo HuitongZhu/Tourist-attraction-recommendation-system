@@ -34,6 +34,10 @@ public class PostInteractionService {
         return postLikeRepository.countByRecomId(recomId);
     }
 
+    public long collectCount(String recomId) {
+        return postCollectRepository.countByRecomId(recomId);
+    }
+
     @Transactional
     public boolean toggleLike(String recomId, String userId) {
         var ex = postLikeRepository.findByRecomIdAndUserId(recomId, userId);

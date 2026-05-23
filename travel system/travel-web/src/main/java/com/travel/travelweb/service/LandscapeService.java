@@ -116,6 +116,10 @@ public class LandscapeService {
         return landLikeRepository.countByLandscapeId(landscapeId);
     }
 
+    public long collectCount(String landscapeId) {
+        return landCollectRepository.countByLandscapeId(landscapeId);
+    }
+
     public List<Landscape> related(String address, String excludeId, int limit) {
         if (address == null || address.isBlank()) {
             return List.of();

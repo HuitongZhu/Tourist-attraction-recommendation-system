@@ -7,6 +7,7 @@ import java.util.Map;
 import java.util.Optional;
 
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -14,7 +15,10 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 
 import com.travel.travelweb.api.ApiResponse;
 import com.travel.travelweb.entity.LandComment;
@@ -141,6 +145,54 @@ public class MyContentController {
             return ResponseEntity.status(403).body(ApiResponse.error(403, e.getMessage()));
         } catch (IOException e) {
             return ResponseEntity.status(500).body(ApiResponse.error(500, "更新失败"));
+        }
+    }
+
+    @PutMapping(value = "/landscapes/{id}/image", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<ApiResponse<LandscapeBackendResponse>> updateMyLandscapeWithImage(
+            @PathVariable String id,
+            @RequestParam(required = false) String title,
+            @RequestParam(required = false) String content,
+            @RequestParam(required = false) String address,
+            @RequestParam(required = false) Double latitude,
+            @RequestParam(required = false) Double longitude,
+            @RequestParam(required = false) String contactPhone,
+            @RequestParam(required = false) String openingTime,
+            @RequestParam(required = false) String level,
+            @RequestPart(value = "image", required = false) MultipartFile image,
+            @RequestHeader(value = "X-User-Id", required = false) String userId) {
+        if (userId == null || userId.isBlank()) {
+            return ResponseEntity.status(401).body(ApiResponse.error(401, "用户未登录"));
+        }
+        try {
+            Double lat = latitude;
+            Double lng = longitude;
+            String addr = address != null ? address.trim() : "";
+            if ((lat == null || lng == null || lat == 0.0 || lng == 0.0) && !addr.isBlank()) {
+                Map<String, Double> coords = amapService.getCoordinates(addr);
+                lat = coords.get("latitude");
+                lng = coords.get("longitude");
+            }
+            landscapeService.updateLandscape(
+                    id,
+                    userId,
+                    title,
+                    content,
+                    address,
+                    lat,
+                    lng,
+                    contactPhone,
+                    openingTime,
+                    level,
+                    image);
+            return landscapeRepository.findById(id)
+                    .filter(l -> userId.equals(l.getUserId()))
+                    .map(l -> ResponseEntity.ok(ApiResponse.success(toLandscapeResponse(l))))
+                    .orElse(ResponseEntity.status(404).body(ApiResponse.error("景点不存在")));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(403).body(ApiResponse.error(403, e.getMessage()));
+        } catch (IOException e) {
+            return ResponseEntity.status(500).body(ApiResponse.error(500, "图片上传失败"));
         }
     }
 
@@ -285,6 +337,7 @@ public class MyContentController {
         r.setPublishTime(p.getPublishTime());
         r.setLikeCount(postLikeRepository.countByRecomId(p.getRecomId()));
         r.setCommentCount(postCommentRepository.findByRecomIdOrderByPublishTimeDesc(p.getRecomId()).size());
+        r.setFavoriteCount(postCollectRepository.countByRecomId(p.getRecomId()));
         return r;
     }
 }

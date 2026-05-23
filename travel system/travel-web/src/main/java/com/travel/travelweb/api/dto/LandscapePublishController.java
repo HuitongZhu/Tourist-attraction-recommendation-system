@@ -81,8 +81,8 @@ public class LandscapePublishController {
             return landscapeService.findById(id)
                     .map(l -> ResponseEntity.ok(ApiResponse.success(toResponse(l))))
                     .orElse(ResponseEntity.ok(ApiResponse.error("创建成功但查询失败")));
-        } catch (IOException e) {
-            return ResponseEntity.status(500).body(ApiResponse.error(500, "发布失败"));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(ApiResponse.error("创建失败：" + e.getMessage()));
         }
     }
 

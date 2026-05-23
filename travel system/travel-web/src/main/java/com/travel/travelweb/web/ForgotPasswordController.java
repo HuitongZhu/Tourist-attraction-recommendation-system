@@ -49,11 +49,10 @@ public class ForgotPasswordController {
     public ResponseEntity<Map<String, Object>> sendCode(@RequestParam String phone) {
         Map<String, Object> result = new HashMap<>();
         try {
-            String code = authService.sendSmsCode(phone);
+            authService.sendSmsCode(phone);
             result.put("success", true);
             result.put("message", "验证码已发送");
-            result.put("code", code);
-        } catch (IllegalArgumentException e) {
+        } catch (IllegalArgumentException | IllegalStateException e) {
             result.put("success", false);
             result.put("message", e.getMessage());
         }

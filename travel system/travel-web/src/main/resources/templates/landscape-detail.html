@@ -37,7 +37,7 @@
                 <div class="actions" th:if="${!pendingAudit}">
                     <form th:if="${loginUserId != null}" th:action="@{/interactions/landscape/{id}/collect(id=${landscape.landscapeId})}" method="post">
                         <button type="submit" class="btn btn-sm" th:classappend="${collected} ? 'btn-primary' : 'btn-outline'"
-                                th:text="${collected} ? '已收藏' : '收藏'">收藏</button>
+                                th:text="${collected} ? '已收藏（' + ${collectCount} + '）' : '收藏（' + ${collectCount} + '）'">收藏</button>
                     </form>
                     <form th:if="${loginUserId != null}" th:action="@{/interactions/landscape/{id}/like(id=${landscape.landscapeId})}" method="post">
                         <button type="submit" class="btn btn-sm" th:classappend="${liked} ? 'btn-primary' : 'btn-outline'"

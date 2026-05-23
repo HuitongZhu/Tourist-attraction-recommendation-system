@@ -18,6 +18,7 @@ public class LandscapeBackendResponse {
     private LocalDateTime publishTime;
     private LocalDateTime auditTime;
     private long likeCount;
+    private long favoriteCount;
     private long commentCount;
 
     public LandscapeBackendResponse() {}
@@ -52,6 +53,8 @@ public class LandscapeBackendResponse {
     public void setAuditTime(LocalDateTime auditTime) { this.auditTime = auditTime; }
     public long getLikeCount() { return likeCount; }
     public void setLikeCount(long likeCount) { this.likeCount = likeCount; }
+    public long getFavoriteCount() { return favoriteCount; }
+    public void setFavoriteCount(long favoriteCount) { this.favoriteCount = favoriteCount; }
     public long getCommentCount() { return commentCount; }
     public void setCommentCount(long commentCount) { this.commentCount = commentCount; }
 }

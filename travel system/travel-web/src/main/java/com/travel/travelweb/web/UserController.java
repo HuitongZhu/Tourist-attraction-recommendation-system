@@ -1,20 +1,22 @@
 package com.travel.travelweb.web;
 
-import com.travel.travelweb.config.LoginInterceptor;
-import com.travel.travelweb.service.UserProfileService;
-import jakarta.servlet.http.HttpSession;
+import java.util.HashMap;
+import java.util.Map;
+
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
-import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
-
-import java.util.HashMap;
-import java.util.Map;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
+
+import com.travel.travelweb.config.LoginInterceptor;
+import com.travel.travelweb.service.UserProfileService;
+
+import jakarta.servlet.http.HttpSession;
 
 @Controller
 @RequestMapping("/user")
@@ -106,11 +108,10 @@ public class UserController {
     public ResponseEntity<Map<String, Object>> sendPasswordCode(@RequestParam String phone) {
         Map<String, Object> result = new HashMap<>();
         try {
-            String code = userProfileService.sendPasswordCode(phone);
+            userProfileService.sendPasswordCode(phone);
             result.put("success", true);
             result.put("message", "验证码已发送");
-            result.put("code", code);
-        } catch (IllegalArgumentException e) {
+        } catch (IllegalArgumentException | IllegalStateException e) {
             result.put("success", false);
             result.put("message", e.getMessage());
         }
@@ -138,11 +139,10 @@ public class UserController {
     public ResponseEntity<Map<String, Object>> sendDeleteCode(@RequestParam String phone) {
         Map<String, Object> result = new HashMap<>();
         try {
-            String code = userProfileService.sendDeleteCode(phone);
+            userProfileService.sendDeleteCode(phone);
             result.put("success", true);
             result.put("message", "验证码已发送");
-            result.put("code", code);
-        } catch (IllegalArgumentException e) {
+        } catch (IllegalArgumentException | IllegalStateException e) {
             result.put("success", false);
             result.put("message", e.getMessage());
         }
