@@ -1,10 +1,11 @@
 package com.example.travel
 
-/** 管理员审核筛选：全部 / 通过 / 未审核 */
+/** 管理员审核筛选：全部 / 通过 / 未审核 / 驳回 */
 object AdminReviewFilter {
     const val ALL = "all"
     const val APPROVED = "approved"
     const val PENDING = "pending"
+    const val REJECTED = "rejected"
 
     fun isPendingStatus(status: String?): Boolean {
         if (status.isNullOrBlank()) return true
@@ -12,6 +13,8 @@ object AdminReviewFilter {
     }
 
     fun isApprovedStatus(status: String?): Boolean = status == "审核通过"
+
+    fun isRejectedStatus(status: String?): Boolean = status == "审核未通过"
 
     fun displayStatus(status: String?): String = when {
         isPendingStatus(status) -> "未审核"

@@ -129,6 +129,7 @@ fun MyScenicManagementScreen(refreshTrigger: Int, onBack: () -> Unit) {
     Scaffold(
         topBar = {
             TopAppBar(
+                windowInsets = WindowInsets.statusBars.union(WindowInsets.displayCutout),
                 title = { Text("我的景点信息") },
                 navigationIcon = {
                     IconButton(onClick = onBack) {

@@ -35,21 +35,14 @@ class MobileVerifyPasswordActivity : ComponentActivity() {
                         onBackClick = { finish() },
                         onSendCodeClick = { phone ->
                             lifecycleScope.launch {
-                                try {
-                                    val response = NetworkClient.apiService.sendSms(phone = phone)
-                                    if (response.isSuccessful) {
-                                        val responseBody = response.body()?.string()
-                                        if (responseBody?.contains("\"success\":true") == true) {
-                                            Toast.makeText(this@MobileVerifyPasswordActivity, "验证码已发送", Toast.LENGTH_SHORT).show()
-                                        } else {
-                                            Toast.makeText(this@MobileVerifyPasswordActivity, "发送失败", Toast.LENGTH_SHORT).show()
-                                        }
-                                    } else {
-                                        Toast.makeText(this@MobileVerifyPasswordActivity, "发送失败", Toast.LENGTH_SHORT).show()
+                                sendSmsCodeAndShow(
+                                    context = this@MobileVerifyPasswordActivity,
+                                    phone = phone,
+                                    type = SmsCodeType.PASSWORD,
+                                    onError = { msg ->
+                                        Toast.makeText(this@MobileVerifyPasswordActivity, msg, Toast.LENGTH_SHORT).show()
                                     }
-                                } catch (e: Exception) {
-                                    Toast.makeText(this@MobileVerifyPasswordActivity, "网络异常", Toast.LENGTH_SHORT).show()
-                                }
+                                )
                             }
                         },
                         onConfirmClick = { phone, code, newPassword ->

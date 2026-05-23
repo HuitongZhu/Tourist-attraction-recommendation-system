@@ -120,24 +120,14 @@ class LoginActivity : ComponentActivity() {
                                     return@launch
                                 }
                                 try {
-                                    val response = NetworkClient.apiService.sendSms(phone = phone)
-                                    if (response.isSuccessful) {
-                                        val responseBody = response.body()?.string()
-                                        if (responseBody?.contains("\"success\":true") == true) {
-                                            Toast.makeText(this@LoginActivity, "验证码已发送", Toast.LENGTH_SHORT).show()
-                                        } else {
-                                            val message = if (responseBody?.contains("message") == true) {
-                                                // 提取错误消息
-                                                val start = responseBody.indexOf("\"message\":\"") + 11
-                                                val end = responseBody.indexOf("\"", start)
-                                                if (start < end) responseBody.substring(start, end) else "发送失败"
-                                            } else {
-                                                "发送失败"
-                                            }
-                                            showError(message)
-                                        }
-                                    } else {
-                                        showError("发送失败")
+                                    val ok = sendSmsCodeAndShow(
+                                        context = this@LoginActivity,
+                                        phone = phone,
+                                        type = SmsCodeType.LOGIN,
+                                        onError = { msg -> showError(msg) }
+                                    )
+                                    if (!ok) {
+                                        // onError 已处理
                                     }
                                 } catch (e: Exception) {
                                     showError("网络异常")

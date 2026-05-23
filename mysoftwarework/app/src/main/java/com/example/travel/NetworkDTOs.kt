@@ -52,6 +52,26 @@ data class PostBackendResponse(
     val auditState: String
 ) {
     fun toPostResponse(): PostResponse {
+        val landscape = if (!landscapeId.isNullOrBlank() && !landscapeTitle.isNullOrBlank()) {
+            LandscapeResponse(
+                id = landscapeId,
+                title = landscapeTitle,
+                content = "",
+                address = "",
+                latitude = null,
+                longitude = null,
+                contactPhone = null,
+                openingTime = null,
+                level = null,
+                status = "审核通过",
+                auditRemark = null,
+                publishedAt = null,
+                auditedAt = null,
+                creator = null
+            )
+        } else {
+            null
+        }
         return PostResponse(
             id = recomId,
             title = title ?: "无标题",
@@ -63,6 +83,7 @@ data class PostBackendResponse(
             publishedAt = publishTime,
             auditedAt = null,
             landscapeId = landscapeId,
+            landscape = landscape,
             author = null
         )
     }
@@ -161,16 +182,20 @@ data class LandscapeBackendResponse(
     val title: String,
     val content: String,
     val address: String,
-    @SerializedName("tel")
+    @SerializedName(value = "landscapeTel", alternate = ["tel"])
     val landscapeTel: String?,
     val openingTime: String?,
     val level: String?,
     val imagePath: String?,
+    @SerializedName(value = "latitude", alternate = ["Latitude", "lat"])
     val latitude: Double?,
+    @SerializedName(value = "longitude", alternate = ["Longitude", "lng", "lon"])
     val longitude: Double?,
     val auditState: String,
     val publishTime: String?,
-    val auditTime: String?
+    val auditTime: String?,
+    val likeCount: Int = 0,
+    val favoriteCount: Int = 0
 ) {
     fun toLandscapeResponse(): LandscapeResponse {
         return LandscapeResponse(
@@ -183,11 +208,14 @@ data class LandscapeBackendResponse(
             contactPhone = landscapeTel,
             openingTime = openingTime,
             level = level,
+            imagePath = imagePath,
             status = auditState,
             auditRemark = null,
             publishedAt = publishTime,
             auditedAt = auditTime,
-            creator = null
+            creator = null,
+            likeCount = likeCount,
+            favoriteCount = favoriteCount
         )
     }
 }
@@ -215,9 +243,11 @@ data class LandscapeResponse(
     val content: String,
     val address: String,
     val imagePath: String? = null,
+    @SerializedName(value = "latitude", alternate = ["Latitude", "lat"])
     val latitude: Double?,
+    @SerializedName(value = "longitude", alternate = ["Longitude", "lng", "lon"])
     val longitude: Double?,
-    @SerializedName("landscapeTel")
+    @SerializedName(value = "landscapeTel", alternate = ["tel"])
     val contactPhone: String?,
     val openingTime: String?,
     val level: String?,
@@ -228,7 +258,9 @@ data class LandscapeResponse(
     val publishedAt: String?,
     @SerializedName("auditTime")
     val auditedAt: String?,
-    val creator: UserSummary?
+    val creator: UserSummary?,
+    val likeCount: Int = 0,
+    val favoriteCount: Int = 0
 )
 
 /**
@@ -260,6 +292,7 @@ data class PostResponse(
     val publishedAt: String?,
     val auditedAt: String?,
     val landscapeId: String?,
+    val landscape: LandscapeResponse? = null,
     val author: UserSummary?
 )
 
@@ -296,6 +329,10 @@ data class CommentRequest(
     val content: String
 )
 
+data class CommentUpdateRequest(
+    val content: String
+)
+
 /**
  * 收藏请求
  */
@@ -321,6 +358,7 @@ data class LikeRequest(
  */
 data class UpdateProfileRequest(
     val realName: String? = null,
+    val phoneNumber: String? = null,
     val idNumber: String? = null,
     val gender: String? = null,
     val birthday: String? = null
@@ -358,20 +396,25 @@ data class InteractionStatusResponse(
 )
 
 /**
- * 地理编码请求
+ * 高德地理编码返回（与 GET /api/amap/geocode 一致）
  */
-data class GeocodeRequest(
-    val address: String
+data class AmapGeocodeResponse(
+    val success: Boolean,
+    val latitude: Double? = null,
+    val longitude: Double? = null,
+    val message: String? = null
 )
 
-/**
- * 地理编码返回结果
- */
 data class GeocodeResponse(
-    val address: String,
     val latitude: Double,
     val longitude: Double,
-    val provider: String
+    val address: String? = null
+)
+
+/** 与 Web landscape-detail.html 一致的高德 JS 地图配置 */
+data class AmapMapConfigResponse(
+    val webJsKey: String?,
+    val jsVersion: String?
 )
 
 /**

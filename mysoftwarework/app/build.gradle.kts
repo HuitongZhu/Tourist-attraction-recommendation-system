@@ -55,12 +55,13 @@ android {
         abortOnError = false  // Lint报错时不中断构建
         checkReleaseBuilds = false  // release时不检查Lint
     }
-}
 
+}
 dependencies {
     // 基础依赖
     implementation("androidx.core:core-ktx:1.12.0")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.7.0")
+    implementation("androidx.lifecycle:lifecycle-runtime-compose:2.7.0")
     implementation("androidx.activity:activity-compose:1.8.2")
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.7.0") // 增加 ViewModel Compose 支持
 
@@ -77,6 +78,7 @@ dependencies {
 
     // 高德地图SDK
     implementation(files("libs/AMap3DMap_11.1.200_AMapSearch_9.7.4_AMapLocation_11.1.200_20260513.aar"))
+    //implementation(name:"AMap3DMap_11.1.200_AMapSearch_9.7.4_AMapLocation_11.1.200_20260513",ext:"aar")
     // Retrofit 网络请求
     implementation("com.squareup.retrofit2:retrofit:2.11.0")
     implementation("com.squareup.retrofit2:converter-gson:2.11.0")

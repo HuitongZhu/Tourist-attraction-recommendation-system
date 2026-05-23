@@ -25,6 +25,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.example.travel.ui.theme.TravelTheme
+import kotlinx.coroutines.MainScope
+import kotlinx.coroutines.launch
 
 class RecommendPostActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -59,18 +61,79 @@ fun RecommendScreen() {
     var posts by remember { mutableStateOf<List<PostResponse>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
 
-    LaunchedEffect(Unit) {
-        try {
-            // 获取审核通过的推荐帖
-            val response = NetworkClient.apiService.getPosts(status = "审核通过")
-            if (response.success && response.data != null) {
-                posts = response.data.toPostResponses()
+    // 获取景点名称
+    suspend fun fetchLandscapeTitle(landscapeId: String): String? {
+        return try {
+            val response = NetworkClient.apiService.getLandscapeById(landscapeId)
+            if (response.isSuccessful && response.body()?.success == true) {
+                response.body()?.data?.title
+            } else {
+                null
             }
         } catch (e: Exception) {
-            Toast.makeText(context, "获取推荐帖失败", Toast.LENGTH_SHORT).show()
-        } finally {
-            isLoading = false
+            null
         }
+    }
+
+    // 搜索函数
+    fun performSearch(keyword: String = "") {
+        isLoading = true
+        // 在协程中执行搜索
+        kotlinx.coroutines.MainScope().launch {
+            try {
+                // 调用后端搜索接口
+                val response = NetworkClient.apiService.getPosts(
+                    keyword = if (keyword.isBlank()) null else keyword,
+                    status = "审核通过"
+                )
+                if (response.success && response.data != null) {
+                    var postList = response.data.toPostResponses()
+                    // 为有landscapeId的帖子获取景点名称
+                    postList = postList.map { post ->
+                        if (!post.landscapeId.isNullOrBlank() && post.landscape == null) {
+                            val landscapeTitle = fetchLandscapeTitle(post.landscapeId)
+                            if (landscapeTitle != null) {
+                                post.copy(
+                                    landscape = LandscapeResponse(
+                                        id = post.landscapeId,
+                                        title = landscapeTitle,
+                                        content = "",
+                                        address = "",
+                                        latitude = null,
+                                        longitude = null,
+                                        contactPhone = null,
+                                        openingTime = null,
+                                        level = null,
+                                        status = "审核通过",
+                                        auditRemark = null,
+                                        publishedAt = null,
+                                        auditedAt = null,
+                                        creator = null
+                                    )
+                                )
+                            } else {
+                                post
+                            }
+                        } else {
+                            post
+                        }
+                    }
+                    posts = postList
+                } else {
+                    posts = emptyList()
+                }
+            } catch (e: Exception) {
+                Toast.makeText(context, "搜索失败: ${e.message}", Toast.LENGTH_SHORT).show()
+                posts = emptyList()
+            } finally {
+                isLoading = false
+            }
+        }
+    }
+
+    LaunchedEffect(Unit) {
+        // 初始化加载所有审核通过的推荐帖
+        performSearch()
     }
     
     LazyColumn(
@@ -82,22 +145,25 @@ fun RecommendScreen() {
             Text(text = "推荐贴", fontSize = 24.sp, fontWeight = FontWeight.Bold)
             Spacer(modifier = Modifier.height(16.dp))
             
-            // 搜索框入口
+            // 搜索框
             Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(50.dp)
-                    .background(Color(0xFFF5F5F5), RoundedCornerShape(8.dp))
-                    .clickable {
-                        val intent = Intent(context, PostSearchActivity::class.java)
-                        context.startActivity(intent)
-                    }
-                    .padding(horizontal = 12.dp),
+                modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Icon(Icons.Default.Search, contentDescription = null, tint = Color.Gray)
-                Spacer(modifier = Modifier.width(8.dp))
-                Text("搜索推荐帖或景点名称...", color = Color.Gray, fontSize = 14.sp)
+                TextField(
+                    value = searchText,
+                    onValueChange = { searchText = it },
+                    placeholder = { Text("搜索推荐帖或景点名称...", color = Color.Gray) },
+                    leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = Color.Gray) },
+                    modifier = Modifier.weight(1f),
+                    singleLine = true,
+                    shape = RoundedCornerShape(8.dp),
+                    trailingIcon = {
+                        IconButton(onClick = { performSearch(searchText) }) {
+                            Text("搜索", color = Color.Blue, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                )
             }
             Spacer(modifier = Modifier.height(16.dp))
         }
@@ -136,6 +202,35 @@ fun RecommendScreen() {
                         Column(modifier = Modifier.padding(16.dp)) {
                             Text(text = post.title, fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
                             Spacer(modifier = Modifier.height(8.dp))
+                            // 显示tag标签
+                            if (!post.tag.isNullOrBlank()) {
+                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    post.tag.split(",").forEach { tag ->
+                                        val trimmedTag = tag.trim()
+                                        if (trimmedTag.isNotEmpty()) {
+                                            Text(
+                                                text = "#$trimmedTag",
+                                                fontSize = 12.sp,
+                                                color = Color(0xFF0066CC)
+                                            )
+                                        }
+                                    }
+                                }
+                                Spacer(modifier = Modifier.height(8.dp))
+                            }
+                            
+                            if (post.landscape != null) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text(text = "📍", fontSize = 12.sp)
+                                    Text(
+                                        text = post.landscape.title,
+                                        fontSize = 12.sp,
+                                        color = Color(0xFF009966)
+                                    )
+                                }
+                                Spacer(modifier = Modifier.height(8.dp))
+                            }
+                            
                             Text(text = post.content, color = Color.Gray, maxLines = 2)
                         }
                     }

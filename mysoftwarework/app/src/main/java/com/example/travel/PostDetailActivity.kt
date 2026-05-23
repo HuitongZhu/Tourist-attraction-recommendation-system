@@ -33,23 +33,24 @@ class PostDetailActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val postId = intent.getStringExtra("postId") ?: ""
+        val adminPreview = intent.getBooleanExtra("adminPreview", false)
         enableEdgeToEdge()
         setContent {
             TravelTheme {
-                PostDetailScreen(postId)
+                PostDetailScreen(postId, adminPreview)
             }
         }
     }
 }
 
 @Composable
-fun PostDetailScreen(postId: String) {
+fun PostDetailScreen(postId: String, adminPreview: Boolean = false) {
     val scope = rememberCoroutineScope()
     var comments by remember { mutableStateOf<List<CommentResponse>>(emptyList()) }
 
     suspend fun loadComments() {
         try {
-            val res = NetworkClient.apiService.getComments(postId = postId)
+            val res = NetworkClient.apiService.getComments(postId = postId, size = 200)
             if (res.success) {
                 comments = res.data?.content ?: emptyList()
             }
@@ -72,33 +73,117 @@ fun PostDetailScreen(postId: String) {
         }
     ) { innerPadding ->
         Column(modifier = Modifier.padding(innerPadding).fillMaxSize()) {
-            PostDetailContent(postId = postId, comments = comments)
+            PostDetailContent(
+                postId = postId,
+                adminPreview = adminPreview,
+                comments = comments,
+                onCommentDeleted = { scope.launch { loadComments() } }
+            )
         }
     }
 }
 
 @Composable
-fun PostDetailContent(postId: String, comments: List<CommentResponse>) {
+fun PostDetailContent(
+    postId: String,
+    adminPreview: Boolean = false,
+    comments: List<CommentResponse>,
+    onCommentDeleted: () -> Unit
+) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var post by remember { mutableStateOf<PostResponse?>(null) }
     var isLiked by remember { mutableStateOf(false) }
     var isFavorited by remember { mutableStateOf(false) }
 
-    LaunchedEffect(postId) {
-        try {
-            val res = NetworkClient.apiService.getPostById(postId)
-            if (res.success && res.data != null) {
-                post = res.data.toPostResponse()
+    // 获取景点名称
+    suspend fun fetchLandscapeTitle(landscapeId: String): String? {
+        return try {
+            val response = NetworkClient.apiService.getLandscapeById(landscapeId)
+            if (response.isSuccessful && response.body()?.success == true) {
+                response.body()?.data?.title
+            } else {
+                null
             }
-            if (UserSession.isLoggedIn()) {
-                InteractionHelper.loadPostStatus(postId)?.let { status ->
-                    isLiked = status.liked
-                    isFavorited = status.favorited
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    LaunchedEffect(postId, adminPreview) {
+        try {
+            if (adminPreview) {
+                val res = NetworkClient.apiService.getAdminPostDetail(postId)
+                if (res.success && res.data != null) {
+                    var postData = res.data.toPostResponse()
+                    // 如果有landscapeId但没有landscape信息，获取景点名称
+                    if (!postData.landscapeId.isNullOrBlank() && postData.landscape == null) {
+                        fetchLandscapeTitle(postData.landscapeId)?.let { title ->
+                            postData = postData.copy(
+                                landscape = LandscapeResponse(
+                                    id = postData.landscapeId,
+                                    title = title,
+                                    content = "",
+                                    address = "",
+                                    latitude = null,
+                                    longitude = null,
+                                    contactPhone = null,
+                                    openingTime = null,
+                                    level = null,
+                                    status = "审核通过",
+                                    auditRemark = null,
+                                    publishedAt = null,
+                                    auditedAt = null,
+                                    creator = null
+                                )
+                            )
+                        }
+                    }
+                    post = postData
+                } else {
+                    Toast.makeText(context, res.message ?: "获取推荐帖详情失败", Toast.LENGTH_SHORT).show()
+                }
+            } else {
+                val res = NetworkClient.apiService.getPostById(postId)
+                if (res.success && res.data != null) {
+                    var postData = res.data.toPostResponse()
+                    // 如果有landscapeId但没有landscape信息，获取景点名称
+                    if (!postData.landscapeId.isNullOrBlank() && postData.landscape == null) {
+                        fetchLandscapeTitle(postData.landscapeId)?.let { title ->
+                            postData = postData.copy(
+                                landscape = LandscapeResponse(
+                                    id = postData.landscapeId,
+                                    title = title,
+                                    content = "",
+                                    address = "",
+                                    latitude = null,
+                                    longitude = null,
+                                    contactPhone = null,
+                                    openingTime = null,
+                                    level = null,
+                                    status = "审核通过",
+                                    auditRemark = null,
+                                    publishedAt = null,
+                                    auditedAt = null,
+                                    creator = null
+                                )
+                            )
+                        }
+                    }
+                    post = postData
+                } else {
+                    Toast.makeText(context, res.message ?: "推荐帖不存在或未审核", Toast.LENGTH_SHORT).show()
+                }
+                if (UserSession.isLoggedIn()) {
+                    InteractionHelper.loadPostStatus(postId)?.let { status ->
+                        isLiked = status.liked
+                        isFavorited = status.favorited
+                    }
                 }
             }
         } catch (e: Exception) {
-            Toast.makeText(context, "加载失败", Toast.LENGTH_SHORT).show()
+            Log.e("PostDetail", "Error loading post: ${e.message}", e)
+            Toast.makeText(context, "加载失败: ${e.message}", Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -176,6 +261,34 @@ fun PostDetailContent(postId: String, comments: List<CommentResponse>) {
         Column(modifier = Modifier.padding(16.dp)) {
             Text(text = post?.title ?: "加载中...", fontSize = 24.sp, fontWeight = FontWeight.Bold)
             
+            if (!post?.tag.isNullOrBlank()) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    post?.tag?.split(",")?.forEach { tag ->
+                        val trimmedTag = tag.trim()
+                        if (trimmedTag.isNotEmpty()) {
+                            Text(
+                                text = "#$trimmedTag",
+                                fontSize = 12.sp,
+                                color = Color(0xFF0066CC)
+                            )
+                        }
+                    }
+                }
+            }
+            
+            post?.landscape?.let { landscape ->
+                Spacer(modifier = Modifier.height(8.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(text = "📍", fontSize = 12.sp)
+                    Text(
+                        text = landscape.title,
+                        fontSize = 12.sp,
+                        color = Color(0xFF009966)
+                    )
+                }
+            }
+            
             Spacer(modifier = Modifier.height(16.dp))
             Text(text = post?.content ?: "", fontSize = 16.sp, lineHeight = 24.sp)
 
@@ -183,7 +296,11 @@ fun PostDetailContent(postId: String, comments: List<CommentResponse>) {
             Text(text = "全部评论 (${comments.size})", fontSize = 18.sp, fontWeight = FontWeight.Bold)
             
             comments.forEach { comment ->
-                CommentItem(comment)
+                CommentItem(
+                    comment = comment,
+                    onDeleted = onCommentDeleted,
+                    onEdited = onCommentDeleted
+                )
             }
             Spacer(modifier = Modifier.height(80.dp))
         }

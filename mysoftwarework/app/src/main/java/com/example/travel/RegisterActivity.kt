@@ -71,25 +71,12 @@ class RegisterActivity : ComponentActivity() {
                                     return@launch
                                 }
                                 try {
-                                    // 使用注册专用的验证码接口
-                                    val response = NetworkClient.apiService.sendRegisterCode(phone = phone)
-                                    if (response.isSuccessful) {
-                                        val responseBody = response.body()?.string()
-                                        if (responseBody?.contains("\"success\":true") == true) {
-                                            Toast.makeText(this@RegisterActivity, "验证码已发送", Toast.LENGTH_SHORT).show()
-                                        } else {
-                                            val message = if (responseBody?.contains("message") == true) {
-                                                val start = responseBody.indexOf("\"message\":\"") + 11
-                                                val end = responseBody.indexOf("\"", start)
-                                                if (start < end) responseBody.substring(start, end) else "发送失败"
-                                            } else {
-                                                "发送失败"
-                                            }
-                                            showError(message)
-                                        }
-                                    } else {
-                                        showError("发送失败")
-                                    }
+                                    sendSmsCodeAndShow(
+                                        context = this@RegisterActivity,
+                                        phone = phone,
+                                        type = SmsCodeType.REGISTER,
+                                        onError = { msg -> showError(msg) }
+                                    )
                                 } catch (e: Exception) {
                                     showError("网络异常")
                                 }
@@ -99,14 +86,13 @@ class RegisterActivity : ComponentActivity() {
                             lifecycleScope.launch {
                                 try {
                                     val response = NetworkClient.apiService.checkUsername(username = username)
-                                    if (response.success) {
-                                        val isAvailable = response.data?.available == true
-                                        callback(isAvailable, "")
+                                    if (response.success && response.data != null) {
+                                        callback(response.data.available, response.data.message)
                                     } else {
-                                        callback(false, "")
+                                        callback(null, response.message ?: "校验失败")
                                     }
                                 } catch (e: Exception) {
-                                    callback(false, "")
+                                    callback(null, "网络异常")
                                 }
                             }
                         }
@@ -123,7 +109,7 @@ fun RegisterScreen(
     onLoginClick: () -> Unit,
     onRegisterClick: (RegisterRequest, (String) -> Unit) -> Unit,
     onSendSmsClick: (String, (String) -> Unit) -> Unit,
-    onCheckUsername: (String, (Boolean, String) -> Unit) -> Unit
+    onCheckUsername: (String, (Boolean?, String?) -> Unit) -> Unit
 ) {
     var username by remember { mutableStateOf("") }
     var phone by remember { mutableStateOf("") }
@@ -160,8 +146,12 @@ fun RegisterScreen(
                 // 当用户名长度>=2时触发检查
                 if (it.length >= 2) {
                     usernameStatus = UsernameStatus.Checking
-                    onCheckUsername(it) { isAvailable, _ ->
-                        usernameStatus = if (isAvailable) UsernameStatus.Available else UsernameStatus.Exists
+                    onCheckUsername(it) { available, _ ->
+                        usernameStatus = when (available) {
+                            true -> UsernameStatus.Available
+                            false -> UsernameStatus.Exists
+                            else -> UsernameStatus.None
+                        }
                     }
                 } else {
                     usernameStatus = UsernameStatus.None

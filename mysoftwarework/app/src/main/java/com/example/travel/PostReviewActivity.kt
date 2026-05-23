@@ -14,6 +14,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
@@ -121,6 +122,37 @@ fun PostReviewItem(post: PostResponse, onAudit: () -> Unit) {
     val scope = rememberCoroutineScope()
     val displayStatus = AdminReviewFilter.displayStatus(post.status)
     val pending = AdminReviewFilter.isPendingStatus(post.status)
+    val approved = AdminReviewFilter.isApprovedStatus(post.status)
+    var showDeleteDialog by remember { mutableStateOf(false) }
+
+    if (showDeleteDialog) {
+        AlertDialog(
+            onDismissRequest = { showDeleteDialog = false },
+            title = { Text("删除推荐帖") },
+            text = { Text("确定删除「${post.title}」？删除后不可恢复。") },
+            confirmButton = {
+                TextButton(onClick = {
+                    showDeleteDialog = false
+                    scope.launch {
+                        try {
+                            val res = NetworkClient.apiService.deleteAdminReviewPost(post.id)
+                            if (res.success) {
+                                Toast.makeText(context, "已删除", Toast.LENGTH_SHORT).show()
+                                onAudit()
+                            } else {
+                                Toast.makeText(context, res.message ?: "删除失败", Toast.LENGTH_SHORT).show()
+                            }
+                        } catch (_: Exception) {
+                            Toast.makeText(context, "删除失败", Toast.LENGTH_SHORT).show()
+                        }
+                    }
+                }) { Text("删除", color = Color.Red) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteDialog = false }) { Text("取消") }
+            }
+        )
+    }
 
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -156,6 +188,7 @@ fun PostReviewItem(post: PostResponse, onAudit: () -> Unit) {
                     onClick = {
                         val intent = Intent(context, PostDetailActivity::class.java)
                         intent.putExtra("postId", post.id)
+                        intent.putExtra("adminPreview", true)
                         context.startActivity(intent)
                     },
                     modifier = Modifier.weight(1f).height(54.dp),
@@ -193,6 +226,18 @@ fun PostReviewItem(post: PostResponse, onAudit: () -> Unit) {
                         Icon(Icons.Default.Check, contentDescription = null, Modifier.size(20.dp))
                         Spacer(modifier = Modifier.width(6.dp))
                         Text("通过", fontSize = 18.sp)
+                    }
+                }
+                if (approved) {
+                    OutlinedButton(
+                        onClick = { showDeleteDialog = true },
+                        modifier = Modifier.weight(1f).height(54.dp),
+                        shape = RoundedCornerShape(27.dp),
+                        border = BorderStroke(1.dp, Color.Red)
+                    ) {
+                        Icon(Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(20.dp), tint = Color.Red)
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("删除", color = Color.Red, fontSize = 18.sp)
                     }
                 }
             }

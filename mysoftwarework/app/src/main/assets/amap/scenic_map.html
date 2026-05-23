@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="utf-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
+    <style>
+        html, body {
+            width: 100%;
+            height: 100%;
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background: #e8e8e8;
+        }
+        #map {
+            width: 100%;
+            height: 100%;
+            min-height: 220px;
+        }
+    </style>
+</head>
+<body>
+    <div id="map"></div>
+    <script>
+        function qp(name) {
+            var match = new RegExp('[?&]' + name + '=([^&]*)').exec(location.search);
+            return match ? decodeURIComponent(match[1].replace(/\+/g, ' ')) : '';
+        }
+
+        var lat = parseFloat(qp('lat'));
+        var lng = parseFloat(qp('lng'));
+        var title = qp('title') || '景点位置';
+        var address = qp('address') || '';
+        var key = qp('key');
+        var version = qp('v') || '1.4.15';
+
+        console.log('[AMap] Params received:', {
+            lat: lat,
+            lng: lng,
+            title: title,
+            address: address,
+            key: key ? '***' : null,
+            version: version
+        });
+
+        function notifyReady() {
+            console.log('[AMap] Notifying Android: map ready');
+            if (window.AndroidBridge && typeof AndroidBridge.onMapReady === 'function') {
+                try {
+                    AndroidBridge.onMapReady();
+                } catch (e) {
+                    console.error('[AMap] Failed to notify Android:', e);
+                }
+            }
+        }
+
+        function notifyError(message) {
+            console.error('[AMap] Error:', message);
+            if (window.AndroidBridge && typeof AndroidBridge.onMapError === 'function') {
+                try {
+                    AndroidBridge.onMapError(message || 'unknown');
+                } catch (e) {
+                    console.error('[AMap] Failed to notify error:', e);
+                }
+            }
+        }
+
+        function initMap() {
+            console.log('[AMap] Initializing map...');
+            
+            if (typeof AMap === 'undefined') {
+                console.error('[AMap] AMap is undefined');
+                notifyError('AMap undefined');
+                return;
+            }
+            
+            if (isNaN(lat) || isNaN(lng)) {
+                console.error('[AMap] Invalid coordinates:', lat, lng);
+                notifyError('invalid coordinates: ' + lat + ', ' + lng);
+                return;
+            }
+            
+            if (!key) {
+                console.error('[AMap] Missing API key');
+                notifyError('missing amap key');
+                return;
+            }
+
+            try {
+                console.log('[AMap] Creating map with center:', [lng, lat]);
+                var map = new AMap.Map('map', {
+                    resizeEnable: true,
+                    zoom: 15,
+                    center: [lng, lat]
+                });
+
+                console.log('[AMap] Adding marker...');
+                var marker = new AMap.Marker({
+                    position: [lng, lat],
+                    title: title
+                });
+                map.add(marker);
+
+                console.log('[AMap] Adding info window...');
+                var infoWindow = new AMap.InfoWindow({
+                    content: '<div style="padding:10px;">' +
+                             '<h4 style="margin:0 0 8px;color:#1a56db;">' + title + '</h4>' +
+                             '<p style="margin:0;font-size:14px;">地址：' + address + '</p>' +
+                             '</div>',
+                    offset: new AMap.Pixel(0, -20)
+                });
+
+                marker.on('click', function() {
+                    infoWindow.open(map, marker.getPosition());
+                });
+
+                map.on('complete', function() {
+                    console.log('[AMap] Map complete event fired');
+                    notifyReady();
+                });
+
+                setTimeout(function() {
+                    console.log('[AMap] Timeout check - forcing ready');
+                    notifyReady();
+                }, 2000);
+
+            } catch (e) {
+                console.error('[AMap] Error initializing map:', e.message || String(e));
+                notifyError(e.message || String(e));
+            }
+        }
+
+        function loadAmapScript() {
+            console.log('[AMap] Loading AMap script...');
+            
+            if (!key) {
+                notifyError('missing amap key');
+                return;
+            }
+
+            var script = document.createElement('script');
+            script.type = 'text/javascript';
+            script.src = 'https://webapi.amap.com/maps?v=' + version + '&key=' + key;
+            
+            script.onload = function() {
+                console.log('[AMap] Script loaded successfully');
+                initMap();
+            };
+            
+            script.onerror = function(evt) {
+                console.error('[AMap] Script load failed:', evt);
+                notifyError('script load failed: ' + (evt.message || 'unknown'));
+            };
+
+            script.onabort = function() {
+                console.error('[AMap] Script load aborted');
+                notifyError('script load aborted');
+            };
+
+            document.head.appendChild(script);
+            console.log('[AMap] Script tag appended');
+        }
+
+        loadAmapScript();
+    </script>
+</body>
+</html>

@@ -71,7 +71,12 @@
             android:name=".MobileVerifyPhoneActivity"
             android:exported="false" />
 
-        <!-- 10. 修改个人信息页 -->
+        <!-- 10. 查看个人信息页 -->
+        <activity
+            android:name=".ViewProfileActivity"
+            android:exported="false" />
+
+        <!-- 10b. 编辑个人信息页 -->
         <activity
             android:name=".EditProfileActivity"
             android:exported="false" />

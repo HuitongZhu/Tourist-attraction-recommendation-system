@@ -100,6 +100,7 @@ fun MyInteractionListScreen(listType: String, onBack: () -> Unit) {
     Scaffold(
         topBar = {
             TopAppBar(
+                windowInsets = WindowInsets.statusBars.union(WindowInsets.displayCutout),
                 title = { Text(MyInteractionListActivity.titleFor(listType)) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {

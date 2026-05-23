@@ -7,21 +7,34 @@ import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.staggeredgrid.LazyVerticalStaggeredGrid
+import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridCells
+import androidx.compose.foundation.lazy.staggeredgrid.items
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material.icons.filled.Place
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.example.travel.ui.theme.TravelTheme
+import kotlinx.coroutines.delay
+import retrofit2.HttpException
 
 class HomeActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -29,162 +42,274 @@ class HomeActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             TravelTheme {
-                var scenicSpots by remember { mutableStateOf<List<LandscapeResponse>>(emptyList()) }
-                var isLoading by remember { mutableStateOf(true) }
-
-                LaunchedEffect(Unit) {
-                    try {
-                        val response = NetworkClient.apiService.getLandscapes(status = "审核通过", size = 6)
-                        if (response.success && response.data != null) {
-                            scenicSpots = response.data
-                            if (scenicSpots.isEmpty()) {
-                                Toast.makeText(this@HomeActivity, "暂无景点数据", Toast.LENGTH_SHORT).show()
-                            }
-                        } else {
-                            Toast.makeText(this@HomeActivity, response.message ?: "获取景点数据失败", Toast.LENGTH_SHORT).show()
-                        }
-                    } catch (e: Exception) {
-                        Log.e("HomeActivity", "Network error: ${e.message}", e)
-                        Toast.makeText(this@HomeActivity, "网络连接失败: ${e.message}", Toast.LENGTH_SHORT).show()
-                    } finally {
-                        isLoading = false
-                    }
-                }
-
-                Column(modifier = Modifier.fillMaxSize()) {
-                    TopNavBar(
-                        currentPage = PageType.HOME,
-                        onPageChange = { page ->
-                            when (page) {
-                                PageType.RECOMMEND -> startActivity(Intent(this@HomeActivity, RecommendPostActivity::class.java))
-                                PageType.PUBLISH_SCENIC -> startActivity(Intent(this@HomeActivity, PublishScenicInfoActivity::class.java))
-                                PageType.PUBLISH_POST -> startActivity(Intent(this@HomeActivity, PublishPostActivity::class.java))
-                                PageType.PERSONAL -> startActivity(Intent(this@HomeActivity, PersonalHomeActivity::class.java))
-                                else -> {}
-                            }
-                        }
-                    )
-
-                    if (isLoading) {
-                        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                            CircularProgressIndicator()
-                        }
-                    } else {
-                        HomeScreen(scenicSpots)
-                    }
-                }
+                HomePage()
             }
         }
     }
 }
 
-/**
- * 从HTML中解析景点信息
- */
-fun parseLandscapesFromHtml(html: String): List<LandscapeResponse> {
-    val landscapes = mutableListOf<LandscapeResponse>()
-    
-    // 打印HTML前500个字符用于调试
-    Log.d("HomeActivity", "HTML content preview: ${html.take(500)}...")
-    
-    // 方法1：使用字符串查找提取数据（更可靠）
-    var remainingHtml = html
-    val hotLandscapeMarker = "hot-landscape"
-    
-    if (remainingHtml.contains(hotLandscapeMarker)) {
-        // 找到热门景点区域
-        val startIndex = remainingHtml.indexOf(hotLandscapeMarker)
-        remainingHtml = remainingHtml.substring(startIndex)
-        
-        // 提取所有景点卡片
-        var cardStart = remainingHtml.indexOf("<div")
-        while (cardStart != -1) {
-            val cardEnd = remainingHtml.indexOf("</div>", cardStart)
-            if (cardEnd == -1) break
-            
-            val cardContent = remainingHtml.substring(cardStart, cardEnd + 6)
-            
-            // 检查是否是景点卡片
-            if (cardContent.contains("card-title") || cardContent.contains("card-info")) {
-                // 提取标题
-                val titleStart = cardContent.indexOf(">", cardContent.indexOf("card-title")) + 1
-                val titleEnd = cardContent.indexOf("<", titleStart)
-                val title = if (titleStart > 0 && titleEnd > titleStart) {
-                    cardContent.substring(titleStart, titleEnd).trim()
-                } else {
-                    "未知景点"
-                }
-                
-                // 提取地点
-                val infoStart = cardContent.indexOf(">", cardContent.indexOf("card-info")) + 1
-                val infoEnd = cardContent.indexOf("<", infoStart)
-                val address = if (infoStart > 0 && infoEnd > infoStart) {
-                    cardContent.substring(infoStart, infoEnd).trim()
-                } else {
-                    ""
-                }
-                
-                landscapes.add(
-                    LandscapeResponse(
-                        id = landscapes.size.toString(),
-                        title = title,
-                        content = "",
-                        address = address,
-                        latitude = null,
-                        longitude = null,
-                        contactPhone = null,
-                        openingTime = null,
-                        level = null,
-                        status = "审核通过",
-                        auditRemark = null,
-                        publishedAt = null,
-                        auditedAt = null,
-                        creator = null
-                    )
-                )
-            }
-            
-            remainingHtml = remainingHtml.substring(cardEnd + 6)
-            cardStart = remainingHtml.indexOf("<div")
+@Composable
+private fun HomePage() {
+    val context = LocalContext.current
+    val activity = context as? ComponentActivity
+
+    var scenicSpots by remember { mutableStateOf<List<LandscapeResponse>>(emptyList()) }
+    var isLoading by remember { mutableStateOf(true) }
+    var searchQuery by remember { mutableStateOf("") }
+
+    LaunchedEffect(searchQuery) {
+        val keyword = searchQuery.trim()
+        if (keyword.isNotEmpty()) delay(400)
+        isLoading = true
+        try {
+            scenicSpots = loadHomeLandscapes(keyword)
+        } catch (e: Exception) {
+            Log.e("HomeActivity", "Load landscapes failed: ${e.message}", e)
+            Toast.makeText(context, "加载失败: ${e.message}", Toast.LENGTH_SHORT).show()
+            scenicSpots = emptyList()
+        } finally {
+            isLoading = false
         }
     }
-    
-    Log.d("HomeActivity", "Parsed ${landscapes.size} landscapes from HTML")
-    
-    return landscapes
+
+    Column(modifier = Modifier.fillMaxSize()) {
+        TopNavBar(
+            currentPage = PageType.HOME,
+            onPageChange = { page ->
+                when (page) {
+                    PageType.RECOMMEND -> activity?.startActivity(Intent(context, RecommendPostActivity::class.java))
+                    PageType.PUBLISH_SCENIC -> activity?.startActivity(Intent(context, PublishScenicInfoActivity::class.java))
+                    PageType.PUBLISH_POST -> activity?.startActivity(Intent(context, PublishPostActivity::class.java))
+                    PageType.PERSONAL -> activity?.startActivity(Intent(context, PersonalHomeActivity::class.java))
+                    else -> {}
+                }
+            }
+        )
+
+        HomeSearchBar(
+            query = searchQuery,
+            onQueryChange = { searchQuery = it },
+            resultCount = scenicSpots.size,
+            isLoading = isLoading
+        )
+
+        when {
+            isLoading -> {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator()
+                }
+            }
+            scenicSpots.isEmpty() -> {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Text(
+                        text = if (searchQuery.isBlank()) "暂无已审核景点" else "未找到匹配的景点",
+                        color = Color.Gray,
+                        fontSize = 15.sp
+                    )
+                }
+            }
+            else -> {
+                HomeScreen(scenicSpots)
+            }
+        }
+    }
+}
+
+@Composable
+private fun HomeSearchBar(
+    query: String,
+    onQueryChange: (String) -> Unit,
+    resultCount: Int,
+    isLoading: Boolean
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(Color.White)
+            .padding(horizontal = 12.dp, vertical = 8.dp)
+    ) {
+        OutlinedTextField(
+            value = query,
+            onValueChange = onQueryChange,
+            modifier = Modifier.fillMaxWidth(),
+            placeholder = { Text("搜索景点名称、地址或介绍…") },
+            leadingIcon = {
+                Icon(Icons.Default.Search, contentDescription = null, tint = Color.Gray)
+            },
+            trailingIcon = {
+                if (query.isNotEmpty()) {
+                    IconButton(onClick = { onQueryChange("") }) {
+                        Icon(Icons.Default.Clear, contentDescription = "清除")
+                    }
+                }
+            },
+            singleLine = true,
+            shape = RoundedCornerShape(24.dp),
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedBorderColor = Color(0xFF1A56DB),
+                unfocusedBorderColor = Color(0xFFE0E0E0)
+            )
+        )
+        if (!isLoading) {
+            Text(
+                text = if (query.isBlank()) "共 $resultCount 个景点" else "找到 $resultCount 个相关景点",
+                fontSize = 12.sp,
+                color = Color.Gray,
+                modifier = Modifier.padding(start = 4.dp, top = 4.dp)
+            )
+        }
+    }
+}
+
+/** 加载首页景点：优先新接口（全部/模糊搜索），失败则回退 */
+private suspend fun loadHomeLandscapes(keyword: String): List<LandscapeResponse> {
+    val api = NetworkClient.apiService
+    val kw = keyword.takeIf { it.isNotBlank() }
+
+    try {
+        val res = api.getHomeLandscapeList(kw)
+        if (res.success && res.data != null) {
+            return res.data.map { it.toLandscapeResponse() }
+        }
+    } catch (e: HttpException) {
+        if (e.code() != 404) throw e
+        Log.w("HomeActivity", "home-list 404, fallback")
+    }
+
+    try {
+        val approved = api.getApprovedLandscapes()
+        if (approved.success && approved.data != null) {
+            val list = approved.data.map { it.toLandscapeResponse() }
+            return if (kw == null) list else fuzzyFilterLandscapes(list, kw)
+        }
+    } catch (e: HttpException) {
+        if (e.code() != 404) throw e
+    }
+
+    val legacy = api.getLandscapes(status = "审核通过", size = 500)
+    if (legacy.success && legacy.data != null) {
+        val list = legacy.data
+        return if (kw == null) list else fuzzyFilterLandscapes(list, kw)
+    }
+    return emptyList()
+}
+
+/** 客户端模糊匹配（标题、地址、介绍） */
+private fun fuzzyFilterLandscapes(list: List<LandscapeResponse>, keyword: String): List<LandscapeResponse> {
+    val q = keyword.trim().lowercase()
+    if (q.isEmpty()) return list
+    return list.filter { spot ->
+        spot.title.lowercase().contains(q) ||
+            spot.address.lowercase().contains(q) ||
+            spot.content.lowercase().contains(q) ||
+            (spot.level?.lowercase()?.contains(q) == true)
+    }
+}
+
+/** 瀑布流卡片图片高度（仿小红书错落排版） */
+private fun homeCardImageHeight(spotId: String, index: Int): Dp {
+    val heights = listOf(168.dp, 200.dp, 184.dp, 216.dp, 176.dp, 208.dp)
+    val key = (spotId.hashCode() and 0x7FFFFFFF) + index
+    return heights[key % heights.size]
 }
 
 @Composable
 fun HomeScreen(spots: List<LandscapeResponse>) {
     val context = LocalContext.current
-    LazyColumn(
-        modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(12.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+    LazyVerticalStaggeredGrid(
+        columns = StaggeredGridCells.Fixed(2),
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color(0xFFF7F7F7)),
+        contentPadding = PaddingValues(horizontal = 6.dp, vertical = 8.dp),
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        verticalItemSpacing = 6.dp
     ) {
-        items(spots) { spot ->
-            Card(
+        items(spots.size, key = { spots[it].id }) { index ->
+            val spot = spots[index]
+            HomeScenicFeedCard(
+                spot = spot,
+                imageHeight = homeCardImageHeight(spot.id, index),
+                onClick = {
+                    val intent = Intent(context, ScenicDetailActivity::class.java)
+                    intent.putExtra("landscapeId", spot.id)
+                    context.startActivity(intent)
+                }
+            )
+        }
+    }
+}
+
+/** 小红书风格：双列瀑布流、图片铺满裁切、标题+地点紧凑展示 */
+@Composable
+fun HomeScenicFeedCard(
+    spot: LandscapeResponse,
+    imageHeight: Dp,
+    onClick: () -> Unit
+) {
+    val imageModel = NetworkClient.mediaUrl(spot.imagePath)
+        ?: "https://via.placeholder.com/400x520.png?text=${spot.title}"
+    val cardShape = RoundedCornerShape(10.dp)
+
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick),
+        shape = cardShape,
+        color = Color.White,
+        shadowElevation = 1.dp
+    ) {
+        Column {
+            AsyncImage(
+                model = imageModel,
+                contentDescription = spot.title,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clickable {
-                        val intent = Intent(context, ScenicDetailActivity::class.java)
-                        intent.putExtra("landscapeId", spot.id)
-                        context.startActivity(intent)
-                    },
-                elevation = CardDefaults.cardElevation(4.dp)
-            ) {
-                Column {
-                    AsyncImage(
-                        model = "https://via.placeholder.com/400x200.png?text=${spot.title}",
-                        contentDescription = spot.title,
-                        modifier = Modifier.fillMaxWidth().height(200.dp)
-                    )
-                    Column(modifier = Modifier.padding(16.dp)) {
-                        Text(text = spot.title, fontSize = 18.sp, fontWeight = FontWeight.Bold)
-                        Text(text = "地点：${spot.address}", fontSize = 12.sp, color = Color.Gray)
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text(text = spot.content, fontSize = 14.sp, maxLines = 2)
+                    .height(imageHeight)
+                    .clip(RoundedCornerShape(topStart = 10.dp, topEnd = 10.dp)),
+                contentScale = ContentScale.Crop
+            )
+            Column(modifier = Modifier.padding(horizontal = 8.dp, vertical = 8.dp)) {
+                Text(
+                    text = spot.title,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = Color(0xFF222222),
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    lineHeight = 18.sp
+                )
+                if (spot.address.isNotBlank()) {
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Place,
+                            contentDescription = null,
+                            modifier = Modifier.size(12.dp),
+                            tint = Color(0xFF999999)
+                        )
+                        Spacer(modifier = Modifier.width(2.dp))
+                        Text(
+                            text = spot.address,
+                            fontSize = 11.sp,
+                            color = Color(0xFF999999),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
                     }
+                }
+                if (!spot.level.isNullOrBlank()) {
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = spot.level,
+                        fontSize = 10.sp,
+                        color = Color(0xFF1A56DB),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
                 }
             }
         }

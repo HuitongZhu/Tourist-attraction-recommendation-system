@@ -7,12 +7,12 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -21,6 +21,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.travel.ui.theme.TravelTheme
@@ -54,18 +55,15 @@ fun CommentReviewMainContent() {
     var refreshTrigger by remember { mutableStateOf(0) }
     var comments by remember { mutableStateOf<List<CommentReviewResponse>>(emptyList()) }
     var isLoading by remember { mutableStateOf(false) }
-    var selectedFilter by remember { mutableStateOf(AdminReviewFilter.ALL) }
 
-    LaunchedEffect(searchText, refreshTrigger, selectedFilter) {
+    LaunchedEffect(searchText, refreshTrigger) {
         isLoading = true
         try {
             val response = NetworkClient.apiService.getAdminReviewComments(
-                filter = selectedFilter,
                 keyword = if (searchText.isEmpty()) null else searchText
             )
             if (response.success) {
-                comments = (response.data ?: emptyList())
-                    .sortedBy { AdminReviewFilter.auditSortOrder(it.auditState) }
+                comments = response.data ?: emptyList()
             } else {
                 Toast.makeText(context, response.message ?: "加载失败", Toast.LENGTH_SHORT).show()
             }
@@ -77,9 +75,7 @@ fun CommentReviewMainContent() {
     }
 
     Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
-        Text("评论审核", fontSize = 30.sp, fontWeight = FontWeight.Bold)
-        Spacer(modifier = Modifier.height(16.dp))
-        ReviewFilterRow(selectedFilter = selectedFilter, onFilterChange = { selectedFilter = it })
+        Text("评论管理", fontSize = 30.sp, fontWeight = FontWeight.Bold)
         Spacer(modifier = Modifier.height(16.dp))
         OutlinedTextField(
             value = searchText,
@@ -103,7 +99,7 @@ fun CommentReviewMainContent() {
         } else {
             LazyColumn(verticalArrangement = Arrangement.spacedBy(16.dp)) {
                 items(comments, key = { it.commentId }) { comment ->
-                    CommentReviewItem(comment = comment, onAudit = { refreshTrigger++ })
+                    CommentReviewItem(comment = comment, onDeleted = { refreshTrigger++ })
                 }
             }
         }
@@ -111,11 +107,9 @@ fun CommentReviewMainContent() {
 }
 
 @Composable
-fun CommentReviewItem(comment: CommentReviewResponse, onAudit: () -> Unit) {
+fun CommentReviewItem(comment: CommentReviewResponse, onDeleted: () -> Unit) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    val displayStatus = AdminReviewFilter.displayStatus(comment.auditState)
-    val pending = AdminReviewFilter.isPendingStatus(comment.auditState)
 
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -138,67 +132,38 @@ fun CommentReviewItem(comment: CommentReviewResponse, onAudit: () -> Unit) {
                         modifier = Modifier.padding(top = 4.dp)
                     )
                 }
-                val statusColor = when {
-                    pending -> Color(0xFFFF9800)
-                    AdminReviewFilter.isApprovedStatus(comment.auditState) -> Color(0xFF2E7D32)
-                    comment.auditState == "审核未通过" -> Color.Red
-                    else -> Color.Gray
-                }
-                Text(text = displayStatus, fontSize = 16.sp, color = statusColor, fontWeight = FontWeight.Medium)
+                Text(
+                    text = "删除",
+                    color = Color.Red,
+                    fontSize = 14.sp,
+                    textDecoration = TextDecoration.Underline,
+                    modifier = Modifier
+                        .clickable {
+                            scope.launch {
+                                try {
+                                    val res = NetworkClient.apiService.deleteAdminComment(comment.commentId)
+                                    if (res.success) {
+                                        Toast.makeText(context, "已删除", Toast.LENGTH_SHORT).show()
+                                        onDeleted()
+                                    } else {
+                                        Toast.makeText(
+                                            context,
+                                            res.message ?: "删除失败",
+                                            Toast.LENGTH_SHORT
+                                        ).show()
+                                    }
+                                } catch (_: Exception) {
+                                    Toast.makeText(context, "删除失败", Toast.LENGTH_SHORT).show()
+                                }
+                            }
+                        }
+                        .padding(start = 8.dp)
+                )
             }
             Spacer(Modifier.height(8.dp))
             Text(text = comment.content, fontSize = 16.sp, color = Color.DarkGray)
             comment.publishTime?.let {
                 Text(text = "时间：$it", fontSize = 13.sp, color = Color.Gray, modifier = Modifier.padding(top = 6.dp))
-            }
-            if (pending) {
-                Spacer(Modifier.height(12.dp))
-                Row(Modifier.fillMaxWidth(), Arrangement.spacedBy(12.dp)) {
-                    Button(
-                        onClick = {
-                            scope.launch {
-                                try {
-                                    val res = NetworkClient.apiService.auditComment(
-                                        comment.commentId,
-                                        AuditRequest(approved = true)
-                                    )
-                                    if (res.success) {
-                                        Toast.makeText(context, "已通过", Toast.LENGTH_SHORT).show()
-                                        onAudit()
-                                    } else {
-                                        Toast.makeText(context, res.message ?: "操作失败", Toast.LENGTH_SHORT).show()
-                                    }
-                                } catch (_: Exception) {
-                                    Toast.makeText(context, "操作失败", Toast.LENGTH_SHORT).show()
-                                }
-                            }
-                        },
-                        modifier = Modifier.weight(1f),
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1A56DB))
-                    ) { Text("通过") }
-                    OutlinedButton(
-                        onClick = {
-                            scope.launch {
-                                try {
-                                    val res = NetworkClient.apiService.auditComment(
-                                        comment.commentId,
-                                        AuditRequest(approved = false)
-                                    )
-                                    if (res.success) {
-                                        Toast.makeText(context, "已驳回并删除", Toast.LENGTH_SHORT).show()
-                                        onAudit()
-                                    } else {
-                                        Toast.makeText(context, res.message ?: "操作失败", Toast.LENGTH_SHORT).show()
-                                    }
-                                } catch (_: Exception) {
-                                    Toast.makeText(context, "操作失败", Toast.LENGTH_SHORT).show()
-                                }
-                            }
-                        },
-                        modifier = Modifier.weight(1f),
-                        border = BorderStroke(1.dp, Color.Red)
-                    ) { Text("驳回", color = Color.Red) }
-                }
             }
         }
     }

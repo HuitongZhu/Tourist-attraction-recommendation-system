@@ -21,6 +21,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.lifecycleScope
 import com.example.travel.ui.theme.TravelTheme
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 class EditScenicActivity : ComponentActivity() {
@@ -93,22 +94,20 @@ fun EditScenicScreen(landscapeId: String, onBack: () -> Unit) {
         }
     }
 
-    LaunchedEffect(scenicLocation) {
-        if (scenicLocation.length > 2) {
-            try {
-                val response = NetworkClient.apiService.geocode(scenicLocation)
-                if (response.success && response.data != null) {
-                    latitude = response.data.latitude
-                    longitude = response.data.longitude
-                }
-            } catch (_: Exception) {
-            }
+    LaunchedEffect(scenicLocation, scenicName) {
+        if (scenicLocation.trim().length <= 2) return@LaunchedEffect
+        delay(600)
+        val coords = GeocodeHelper.fetchCoordinates(scenicLocation, scenicName)
+        if (coords != null) {
+            latitude = coords.first
+            longitude = coords.second
         }
     }
 
     Scaffold(
         topBar = {
             TopAppBar(
+                windowInsets = WindowInsets.statusBars.union(WindowInsets.displayCutout),
                 title = { Text("编辑景点信息") },
                 navigationIcon = {
                     IconButton(onClick = onBack) {

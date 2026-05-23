@@ -55,6 +55,7 @@ fun ScenicSearchTopNavBar() {
         modifier = Modifier
             .fillMaxWidth()
             .background(Color(0xFF1A56DB))
+            .topBarSafePadding()
             .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween

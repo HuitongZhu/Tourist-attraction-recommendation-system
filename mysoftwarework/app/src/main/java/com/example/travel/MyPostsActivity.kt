@@ -21,7 +21,9 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.lifecycleScope
 import com.example.travel.ui.theme.TravelTheme
+import kotlinx.coroutines.launch
 
 class MyPostsActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -29,7 +31,10 @@ class MyPostsActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             TravelTheme {
-                MyPostsScreen(onBack = { finish() })
+                MyPostsScreen(
+                    activity = this,
+                    onBack = { finish() }
+                )
             }
         }
     }
@@ -44,18 +49,18 @@ private fun postStatusColor(status: String): Color = when (status) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun MyPostsScreen(onBack: () -> Unit) {
+fun MyPostsScreen(
+    activity: ComponentActivity?,
+    onBack: () -> Unit
+) {
     val context = LocalContext.current
     var posts by remember { mutableStateOf<List<PostBackendResponse>>(emptyList()) }
     var loading by remember { mutableStateOf(true) }
     var expandedId by remember { mutableStateOf<String?>(null) }
+    var deleteTarget by remember { mutableStateOf<PostBackendResponse?>(null) }
 
-    LaunchedEffect(Unit) {
-        if (!UserSession.isLoggedIn()) {
-            Toast.makeText(context, "请先登录", Toast.LENGTH_SHORT).show()
-            loading = false
-            return@LaunchedEffect
-        }
+    suspend fun reload() {
+        loading = true
         try {
             val res = NetworkClient.apiService.getMyPosts()
             if (res.success) {
@@ -70,9 +75,52 @@ fun MyPostsScreen(onBack: () -> Unit) {
         }
     }
 
+    LaunchedEffect(Unit) {
+        if (!UserSession.isLoggedIn()) {
+            Toast.makeText(context, "请先登录", Toast.LENGTH_SHORT).show()
+            loading = false
+            return@LaunchedEffect
+        }
+        reload()
+    }
+
+    if (deleteTarget != null) {
+        val title = deleteTarget?.title?.takeIf { it.isNotBlank() }
+            ?: deleteTarget?.tag?.takeIf { it.isNotBlank() }
+            ?: "该推荐帖"
+        AlertDialog(
+            onDismissRequest = { deleteTarget = null },
+            title = { Text("删除推荐帖") },
+            text = { Text("确定删除「$title」？删除后不可恢复。") },
+            confirmButton = {
+                TextButton(onClick = {
+                    val id = deleteTarget?.recomId ?: return@TextButton
+                    deleteTarget = null
+                    activity?.lifecycleScope?.launch {
+                        try {
+                            val res = NetworkClient.apiService.deleteMyPost(id)
+                            if (res.success) {
+                                Toast.makeText(context, "已删除", Toast.LENGTH_SHORT).show()
+                                reload()
+                            } else {
+                                Toast.makeText(context, res.message ?: "删除失败", Toast.LENGTH_SHORT).show()
+                            }
+                        } catch (e: Exception) {
+                            Toast.makeText(context, "删除失败: ${e.message}", Toast.LENGTH_SHORT).show()
+                        }
+                    }
+                }) { Text("删除", color = Color.Red) }
+            },
+            dismissButton = {
+                TextButton(onClick = { deleteTarget = null }) { Text("取消") }
+            }
+        )
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
+                windowInsets = WindowInsets.statusBars.union(WindowInsets.displayCutout),
                 title = { Text("我的推荐帖") },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
@@ -102,7 +150,8 @@ fun MyPostsScreen(onBack: () -> Unit) {
                             expanded = expandedId == post.recomId,
                             onToggle = {
                                 expandedId = if (expandedId == post.recomId) null else post.recomId
-                            }
+                            },
+                            onDelete = { deleteTarget = post }
                         )
                     }
                 }
@@ -115,15 +164,14 @@ fun MyPostsScreen(onBack: () -> Unit) {
 private fun MyPostListItem(
     post: PostBackendResponse,
     expanded: Boolean,
-    onToggle: () -> Unit
+    onToggle: () -> Unit,
+    onDelete: () -> Unit
 ) {
     val statusColor = postStatusColor(post.auditState)
     val displayTitle = post.title?.takeIf { it.isNotBlank() } ?: post.tag ?: "无标题"
 
     Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onToggle),
+        modifier = Modifier.fillMaxWidth(),
         elevation = CardDefaults.cardElevation(2.dp),
         shape = RoundedCornerShape(8.dp)
     ) {
@@ -157,29 +205,44 @@ private fun MyPostListItem(
             post.publishTime?.let {
                 Text("发布时间：$it", fontSize = 13.sp, color = Color.Gray, modifier = Modifier.padding(top = 2.dp))
             }
-            if (expanded) {
-                Spacer(modifier = Modifier.height(8.dp))
-                Text(post.content, fontSize = 14.sp, color = Color.DarkGray)
-                Text(
-                    text = "点击收起",
-                    fontSize = 12.sp,
-                    color = Color(0xFF4A90E2),
-                    modifier = Modifier.padding(top = 8.dp)
-                )
-            } else {
-                Text(
-                    post.content,
-                    fontSize = 14.sp,
-                    color = Color.Gray,
-                    maxLines = 2,
-                    modifier = Modifier.padding(top = 6.dp)
-                )
-                Text(
-                    "点击查看全文",
-                    fontSize = 12.sp,
-                    color = Color(0xFF4A90E2),
-                    modifier = Modifier.padding(top = 4.dp)
-                )
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable(onClick = onToggle)
+            ) {
+                if (expanded) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(post.content, fontSize = 14.sp, color = Color.DarkGray)
+                    Text(
+                        text = "点击收起",
+                        fontSize = 12.sp,
+                        color = Color(0xFF4A90E2),
+                        modifier = Modifier.padding(top = 8.dp)
+                    )
+                } else {
+                    Text(
+                        post.content,
+                        fontSize = 14.sp,
+                        color = Color.Gray,
+                        maxLines = 2,
+                        modifier = Modifier.padding(top = 6.dp)
+                    )
+                    Text(
+                        "点击查看全文",
+                        fontSize = 12.sp,
+                        color = Color(0xFF4A90E2),
+                        modifier = Modifier.padding(top = 4.dp)
+                    )
+                }
+            }
+            Spacer(modifier = Modifier.height(12.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End
+            ) {
+                OutlinedButton(onClick = onDelete) {
+                    Text("删除", color = Color.Red)
+                }
             }
         }
     }

@@ -128,12 +128,6 @@ fun PersonalHomeContent(displayName: String, userTypeLabel: String) {
                     Text("编辑个人资料")
                 }
                 Button(
-                    onClick = { context.startActivity(Intent(context, ChangePhoneActivity::class.java)) },
-                    modifier = Modifier.fillMaxWidth(0.8f)
-                ) {
-                    Text("修改手机号")
-                }
-                Button(
                     onClick = { context.startActivity(Intent(context, ChangePasswordActivity::class.java)) },
                     modifier = Modifier.fillMaxWidth(0.8f)
                 ) {
@@ -157,7 +151,7 @@ fun PersonalHomeContent(displayName: String, userTypeLabel: String) {
                 Text("个人中心", fontSize = 16.sp, fontWeight = FontWeight.Bold)
 
                 TextButton(
-                    onClick = { context.startActivity(Intent(context, EditProfileActivity::class.java)) },
+                    onClick = { context.startActivity(Intent(context, ViewProfileActivity::class.java)) },
                     contentPadding = PaddingValues(0.dp)
                 ) {
                     Text("个人资料", color = Color(0xFF4A90E2), fontWeight = FontWeight.Bold)

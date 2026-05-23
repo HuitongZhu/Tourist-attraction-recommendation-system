@@ -75,7 +75,7 @@ fun PostSearchScreen(initialKeyword: String, onBack: () -> Unit) {
             modifier = Modifier
                 .fillMaxWidth()
                 .background(Color(0xFF1A56DB))
-                .statusBarsPadding()
+                .topBarSafePadding()
                 .padding(vertical = 12.dp),
             contentAlignment = Alignment.Center
         ) {

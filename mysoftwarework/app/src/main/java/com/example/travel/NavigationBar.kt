@@ -19,6 +19,14 @@ enum class PageType {
     HOME, RECOMMEND, PERSONAL, PUBLISH_SCENIC, PUBLISH_POST
 }
 
+/** 顶部栏避开状态栏、挖孔摄像头等区域（用户端/管理员端共用） */
+@Composable
+fun Modifier.topBarSafePadding(): Modifier = windowInsetsPadding(
+    WindowInsets.statusBars
+        .union(WindowInsets.displayCutout)
+        .only(WindowInsetsSides.Top)
+)
+
 /**
  * 统一顶部导航栏组件
  */
@@ -31,6 +39,7 @@ fun TopNavBar(
         modifier = Modifier
             .fillMaxWidth()
             .background(Color(0xFF1A56DB))
+            .topBarSafePadding()
             .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {

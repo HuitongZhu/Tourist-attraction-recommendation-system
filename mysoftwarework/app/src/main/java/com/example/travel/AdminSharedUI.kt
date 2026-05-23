@@ -4,7 +4,9 @@ import android.content.Intent
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Surface
@@ -31,7 +33,7 @@ fun AdminTopNavBar(showAvatar: Boolean = true, onProfileClick: (() -> Unit)? = n
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .statusBarsPadding()
+                .topBarSafePadding()
                 .padding(horizontal = 16.dp, vertical = 14.dp),
             contentAlignment = Alignment.Center
         ) {
@@ -146,13 +148,19 @@ fun AdminSidebarItem(text: String, isSelected: Boolean, onClick: () -> Unit) {
     )
 }
 
-/** 审核页筛选：全部 / 通过 / 未审核 */
+/** 审核页筛选：全部 / 通过 / 未审核 / 驳回（横向滑动） */
 @Composable
 fun ReviewFilterRow(selectedFilter: String, onFilterChange: (String) -> Unit) {
-    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .horizontalScroll(rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
         StatusChip("全部", selectedFilter == AdminReviewFilter.ALL) { onFilterChange(AdminReviewFilter.ALL) }
         StatusChip("通过", selectedFilter == AdminReviewFilter.APPROVED) { onFilterChange(AdminReviewFilter.APPROVED) }
         StatusChip("未审核", selectedFilter == AdminReviewFilter.PENDING) { onFilterChange(AdminReviewFilter.PENDING) }
+        StatusChip("驳回", selectedFilter == AdminReviewFilter.REJECTED) { onFilterChange(AdminReviewFilter.REJECTED) }
     }
 }
 

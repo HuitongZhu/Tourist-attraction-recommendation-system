@@ -106,17 +106,12 @@ fun DeleteAccountDialog(
                                             isLoading = true
                                             coroutineScope.launch {
                                                 try {
-                                                    val response = NetworkClient.apiService.sendSms(phone)
-                                                    if (response.isSuccessful) {
-                                                        val body = response.body()?.string()
-                                                        if (body?.contains("\"success\":true") == true) {
-                                                            Toast.makeText(context, "验证码已发送", Toast.LENGTH_SHORT).show()
-                                                        } else {
-                                                            errorMessage = "发送失败"
-                                                        }
-                                                    } else {
-                                                        errorMessage = "发送失败"
-                                                    }
+                                                    sendSmsCodeAndShow(
+                                                        context = context,
+                                                        phone = phone,
+                                                        type = SmsCodeType.DELETE,
+                                                        onError = { msg -> errorMessage = msg }
+                                                    )
                                                 } catch (e: Exception) {
                                                     errorMessage = "网络异常"
                                                 } finally {
