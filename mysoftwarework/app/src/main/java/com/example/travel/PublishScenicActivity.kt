@@ -440,24 +440,54 @@ fun PublishScenicInfoContent() {
                                 level = MultipartUtil.textPart(scenicLevel),
                                 image = imagePart
                             )
-                            val response = try {
-                                NetworkClient.apiService.publishLandscapeApp(
+                            var response: ApiResponse<*>? = null
+                            var firstErrorMessage: String? = null
+                            
+                            // 先尝试第一个接口
+                            try {
+                                response = NetworkClient.apiService.publishLandscapeApp(
                                     parts.title, parts.address, parts.content,
                                     parts.latitude, parts.longitude,
                                     parts.tel, parts.openingTime, parts.level, parts.image
                                 )
-                            } catch (_: retrofit2.HttpException) {
-                                NetworkClient.apiService.publishLandscapeMultipart(
-                                    parts.title, parts.address, parts.content,
-                                    parts.latitude, parts.longitude,
-                                    parts.tel, parts.openingTime, parts.level, parts.image
-                                )
+                            } catch (e: retrofit2.HttpException) {
+                                // 捕获第一个接口的错误信息
+                                firstErrorMessage = e.response()?.errorBody()?.string()
+                                // 尝试解析错误消息
+                                try {
+                                    val errorJson = firstErrorMessage?.let {
+                                        com.google.gson.Gson().fromJson(it, ApiResponse::class.java)
+                                    }
+                                    if (errorJson?.message?.isNotBlank() == true) {
+                                        firstErrorMessage = errorJson.message
+                                    }
+                                } catch (_: Exception) {
+                                    // 解析失败，保持原始消息
+                                }
                             }
-                            if (response.success && response.data != null) {
+                            
+                            // 如果第一个接口失败，尝试第二个接口
+                            if (response == null || !response.success) {
+                                try {
+                                    response = NetworkClient.apiService.publishLandscapeMultipart(
+                                        parts.title, parts.address, parts.content,
+                                        parts.latitude, parts.longitude,
+                                        parts.tel, parts.openingTime, parts.level, parts.image
+                                    )
+                                } catch (_: Exception) {
+                                    // 第二个接口也失败，使用第一个接口的错误消息
+                                }
+                            }
+                            
+                            if (response != null && response.success && response.data != null) {
                                 Toast.makeText(context, "发布成功，等待管理员审核", Toast.LENGTH_SHORT).show()
                                 activity.finish()
                             } else {
-                                Toast.makeText(context, response.message ?: "发布失败", Toast.LENGTH_SHORT).show()
+                                // 优先显示第一个接口的错误消息
+                                val errorMsg = firstErrorMessage 
+                                    ?: response?.message 
+                                    ?: "发布失败"
+                                Toast.makeText(context, errorMsg, Toast.LENGTH_SHORT).show()
                             }
                         } catch (e: retrofit2.HttpException) {
                             val msg = when (e.code()) {

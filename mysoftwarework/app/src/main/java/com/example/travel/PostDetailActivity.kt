@@ -47,8 +47,11 @@ class PostDetailActivity : ComponentActivity() {
 fun PostDetailScreen(postId: String, adminPreview: Boolean = false) {
     val scope = rememberCoroutineScope()
     var comments by remember { mutableStateOf<List<CommentResponse>>(emptyList()) }
+    var refreshKey by remember { mutableIntStateOf(0) }
+    var isRefreshing by remember { mutableStateOf(false) }
 
-    suspend fun loadComments() {
+    suspend fun reloadAll() {
+        isRefreshing = true
         try {
             val res = NetworkClient.apiService.getComments(postId = postId, size = 200)
             if (res.success) {
@@ -57,10 +60,12 @@ fun PostDetailScreen(postId: String, adminPreview: Boolean = false) {
         } catch (e: Exception) {
             Log.e("PostDetail", "Error loading comments: ${e.message}", e)
         }
+        refreshKey++
+        isRefreshing = false
     }
 
     LaunchedEffect(postId) {
-        loadComments()
+        reloadAll()
     }
 
     Scaffold(
@@ -68,16 +73,21 @@ fun PostDetailScreen(postId: String, adminPreview: Boolean = false) {
             CommentInputBar(
                 landscapeId = null,
                 postId = postId,
-                onCommentPosted = { scope.launch { loadComments() } }
+                onCommentPosted = { scope.launch { reloadAll() } }
             )
         }
     ) { innerPadding ->
-        Column(modifier = Modifier.padding(innerPadding).fillMaxSize()) {
+        PullToRefreshBox(
+            isRefreshing = isRefreshing,
+            onRefresh = { scope.launch { reloadAll() } },
+            modifier = Modifier.padding(innerPadding)
+        ) {
             PostDetailContent(
                 postId = postId,
                 adminPreview = adminPreview,
                 comments = comments,
-                onCommentDeleted = { scope.launch { loadComments() } }
+                refreshKey = refreshKey,
+                onCommentDeleted = { scope.launch { reloadAll() } }
             )
         }
     }
@@ -88,15 +98,16 @@ fun PostDetailContent(
     postId: String,
     adminPreview: Boolean = false,
     comments: List<CommentResponse>,
+    refreshKey: Int,
     onCommentDeleted: () -> Unit
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var post by remember { mutableStateOf<PostResponse?>(null) }
+    var detailLoading by remember { mutableStateOf(true) }
     var isLiked by remember { mutableStateOf(false) }
     var isFavorited by remember { mutableStateOf(false) }
 
-    // 获取景点名称
     suspend fun fetchLandscapeTitle(landscapeId: String): String? {
         return try {
             val response = NetworkClient.apiService.getLandscapeById(landscapeId)
@@ -110,13 +121,13 @@ fun PostDetailContent(
         }
     }
 
-    LaunchedEffect(postId, adminPreview) {
+    LaunchedEffect(postId, adminPreview, refreshKey) {
+        detailLoading = true
         try {
             if (adminPreview) {
                 val res = NetworkClient.apiService.getAdminPostDetail(postId)
                 if (res.success && res.data != null) {
                     var postData = res.data.toPostResponse()
-                    // 如果有landscapeId但没有landscape信息，获取景点名称
                     if (!postData.landscapeId.isNullOrBlank() && postData.landscape == null) {
                         fetchLandscapeTitle(postData.landscapeId)?.let { title ->
                             postData = postData.copy(
@@ -147,7 +158,6 @@ fun PostDetailContent(
                 val res = NetworkClient.apiService.getPostById(postId)
                 if (res.success && res.data != null) {
                     var postData = res.data.toPostResponse()
-                    // 如果有landscapeId但没有landscape信息，获取景点名称
                     if (!postData.landscapeId.isNullOrBlank() && postData.landscape == null) {
                         fetchLandscapeTitle(postData.landscapeId)?.let { title ->
                             postData = postData.copy(
@@ -181,10 +191,26 @@ fun PostDetailContent(
                     }
                 }
             }
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            // 协程被取消，这是正常的生命周期事件，不需要处理
         } catch (e: Exception) {
             Log.e("PostDetail", "Error loading post: ${e.message}", e)
             Toast.makeText(context, "加载失败: ${e.message}", Toast.LENGTH_SHORT).show()
+        } finally {
+            detailLoading = false
         }
+    }
+
+    if (detailLoading && post == null) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.White),
+            contentAlignment = Alignment.Center
+        ) {
+            CircularProgressIndicator()
+        }
+        return
     }
 
     Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
@@ -195,8 +221,7 @@ fun PostDetailContent(
                 contentDescription = null,
                 modifier = Modifier.fillMaxSize()
             )
-            
-            // 右下角悬浮按钮组 (点赞和收藏)
+
             Row(
                 modifier = Modifier
                     .align(Alignment.BottomEnd)
@@ -205,62 +230,75 @@ fun PostDetailContent(
                     .padding(horizontal = 8.dp, vertical = 4.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                IconButton(onClick = {
-                    if (!UserSession.isLoggedIn()) {
-                        Toast.makeText(context, "请先登录", Toast.LENGTH_SHORT).show()
-                        return@IconButton
-                    }
-                    scope.launch {
-                        try {
-                            val liked = InteractionHelper.togglePostLike(postId)
-                            if (liked != null) {
-                                isLiked = liked
-                                Toast.makeText(context, if (isLiked) "点赞成功" else "取消点赞", Toast.LENGTH_SHORT).show()
-                            } else {
-                                Toast.makeText(context, "操作失败", Toast.LENGTH_SHORT).show()
-                            }
-                        } catch (e: Exception) {
-                            Toast.makeText(context, "网络异常", Toast.LENGTH_SHORT).show()
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    IconButton(onClick = {
+                        if (!UserSession.isLoggedIn()) {
+                            Toast.makeText(context, "请先登录", Toast.LENGTH_SHORT).show()
+                            return@IconButton
                         }
+                        scope.launch {
+                            try {
+                                val liked = InteractionHelper.togglePostLike(postId)
+                                if (liked != null) {
+                                    isLiked = liked
+                                    post = post?.copy(
+                                        likeCount = if (liked) (post?.likeCount ?: 0) + 1 else (post?.likeCount ?: 0) - 1
+                                    )
+                                    Toast.makeText(context, if (isLiked) "点赞成功" else "取消点赞", Toast.LENGTH_SHORT).show()
+                                } else {
+                                    Toast.makeText(context, "操作失败", Toast.LENGTH_SHORT).show()
+                                }
+                            } catch (e: Exception) {
+                                Toast.makeText(context, "网络异常", Toast.LENGTH_SHORT).show()
+                            }
+                        }
+                    }) {
+                        Icon(
+                            imageVector = if (isLiked) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
+                            contentDescription = "Like",
+                            tint = if (isLiked) Color.Red else Color.White
+                        )
                     }
-                }) {
-                    Icon(
-                        imageVector = if (isLiked) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
-                        contentDescription = "Like",
-                        tint = if (isLiked) Color.Red else Color.White
-                    )
+                    Text(text = "${post?.likeCount ?: 0}", color = Color.White, fontSize = 14.sp)
                 }
-                IconButton(onClick = {
-                    if (!UserSession.isLoggedIn()) {
-                        Toast.makeText(context, "请先登录", Toast.LENGTH_SHORT).show()
-                        return@IconButton
-                    }
-                    scope.launch {
-                        try {
-                            val favorited = InteractionHelper.togglePostFavorite(postId)
-                            if (favorited != null) {
-                                isFavorited = favorited
-                                Toast.makeText(context, if (isFavorited) "收藏成功" else "取消收藏", Toast.LENGTH_SHORT).show()
-                            } else {
-                                Toast.makeText(context, "操作失败", Toast.LENGTH_SHORT).show()
-                            }
-                        } catch (e: Exception) {
-                            Toast.makeText(context, "网络异常", Toast.LENGTH_SHORT).show()
+                Spacer(modifier = Modifier.width(8.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    IconButton(onClick = {
+                        if (!UserSession.isLoggedIn()) {
+                            Toast.makeText(context, "请先登录", Toast.LENGTH_SHORT).show()
+                            return@IconButton
                         }
+                        scope.launch {
+                            try {
+                                val favorited = InteractionHelper.togglePostFavorite(postId)
+                                if (favorited != null) {
+                                    isFavorited = favorited
+                                    post = post?.copy(
+                                        favoriteCount = if (favorited) (post?.favoriteCount ?: 0) + 1 else (post?.favoriteCount ?: 0) - 1
+                                    )
+                                    Toast.makeText(context, if (isFavorited) "收藏成功" else "取消收藏", Toast.LENGTH_SHORT).show()
+                                } else {
+                                    Toast.makeText(context, "操作失败", Toast.LENGTH_SHORT).show()
+                                }
+                            } catch (e: Exception) {
+                                Toast.makeText(context, "网络异常", Toast.LENGTH_SHORT).show()
+                            }
+                        }
+                    }) {
+                        Icon(
+                            imageVector = if (isFavorited) Icons.Filled.Star else Icons.Outlined.Star,
+                            contentDescription = "Favorite",
+                            tint = if (isFavorited) Color(0xFFFFD700) else Color.White
+                        )
                     }
-                }) {
-                    Icon(
-                        imageVector = if (isFavorited) Icons.Filled.Star else Icons.Outlined.Star,
-                        contentDescription = "Favorite",
-                        tint = if (isFavorited) Color(0xFFFFD700) else Color.White
-                    )
+                    Text(text = "${post?.favoriteCount ?: 0}", color = Color.White, fontSize = 14.sp)
                 }
             }
         }
 
         Column(modifier = Modifier.padding(16.dp)) {
             Text(text = post?.title ?: "加载中...", fontSize = 24.sp, fontWeight = FontWeight.Bold)
-            
+
             if (!post?.tag.isNullOrBlank()) {
                 Spacer(modifier = Modifier.height(8.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -276,7 +314,7 @@ fun PostDetailContent(
                     }
                 }
             }
-            
+
             post?.landscape?.let { landscape ->
                 Spacer(modifier = Modifier.height(8.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -288,13 +326,13 @@ fun PostDetailContent(
                     )
                 }
             }
-            
+
             Spacer(modifier = Modifier.height(16.dp))
             Text(text = post?.content ?: "", fontSize = 16.sp, lineHeight = 24.sp)
 
             Divider(modifier = Modifier.padding(vertical = 16.dp))
             Text(text = "全部评论 (${comments.size})", fontSize = 18.sp, fontWeight = FontWeight.Bold)
-            
+
             comments.forEach { comment ->
                 CommentItem(
                     comment = comment,

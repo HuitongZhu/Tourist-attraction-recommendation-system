@@ -34,6 +34,7 @@ import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.example.travel.ui.theme.TravelTheme
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import retrofit2.HttpException
 
 class HomeActivity : ComponentActivity() {
@@ -52,24 +53,31 @@ class HomeActivity : ComponentActivity() {
 private fun HomePage() {
     val context = LocalContext.current
     val activity = context as? ComponentActivity
+    val scope = rememberCoroutineScope()
 
     var scenicSpots by remember { mutableStateOf<List<LandscapeResponse>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
+    var isRefreshing by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
 
-    LaunchedEffect(searchQuery) {
-        val keyword = searchQuery.trim()
-        if (keyword.isNotEmpty()) delay(400)
-        isLoading = true
+    suspend fun loadData(showFullLoading: Boolean = false) {
+        if (showFullLoading) isLoading = true
         try {
-            scenicSpots = loadHomeLandscapes(keyword)
+            scenicSpots = loadHomeLandscapes(searchQuery.trim())
         } catch (e: Exception) {
             Log.e("HomeActivity", "Load landscapes failed: ${e.message}", e)
             Toast.makeText(context, "加载失败: ${e.message}", Toast.LENGTH_SHORT).show()
             scenicSpots = emptyList()
         } finally {
             isLoading = false
+            isRefreshing = false
         }
+    }
+
+    LaunchedEffect(searchQuery) {
+        val keyword = searchQuery.trim()
+        if (keyword.isNotEmpty()) delay(400)
+        loadData(showFullLoading = true)
     }
 
     Column(modifier = Modifier.fillMaxSize()) {
@@ -90,26 +98,37 @@ private fun HomePage() {
             query = searchQuery,
             onQueryChange = { searchQuery = it },
             resultCount = scenicSpots.size,
-            isLoading = isLoading
+            isLoading = isLoading && !isRefreshing
         )
 
-        when {
-            isLoading -> {
-                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator()
+        PullToRefreshBox(
+            isRefreshing = isRefreshing,
+            onRefresh = {
+                scope.launch {
+                    isRefreshing = true
+                    loadData(showFullLoading = false)
                 }
-            }
-            scenicSpots.isEmpty() -> {
-                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text(
-                        text = if (searchQuery.isBlank()) "暂无已审核景点" else "未找到匹配的景点",
-                        color = Color.Gray,
-                        fontSize = 15.sp
-                    )
+            },
+            modifier = Modifier.weight(1f)
+        ) {
+            when {
+                isLoading && scenicSpots.isEmpty() -> {
+                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator()
+                    }
                 }
-            }
-            else -> {
-                HomeScreen(scenicSpots)
+                scenicSpots.isEmpty() -> {
+                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Text(
+                            text = if (searchQuery.isBlank()) "暂无已审核景点" else "未找到匹配的景点",
+                            color = Color.Gray,
+                            fontSize = 15.sp
+                        )
+                    }
+                }
+                else -> {
+                    HomeScreen(scenicSpots)
+                }
             }
         }
     }

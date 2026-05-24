@@ -242,7 +242,10 @@ fun CommentInputBar(
             Spacer(modifier = Modifier.width(8.dp))
             IconButton(
                 onClick = {
-                    if (commentText.isBlank()) return@IconButton
+                    if (commentText.isBlank()) {
+                        Toast.makeText(context, "评论内容不能为空", Toast.LENGTH_SHORT).show()
+                        return@IconButton
+                    }
                     // 验证landscapeId或postId是否有效
                     if (landscapeId.isNullOrBlank() && postId.isNullOrBlank()) {
                         Toast.makeText(context, "无法获取评论目标ID", Toast.LENGTH_SHORT).show()

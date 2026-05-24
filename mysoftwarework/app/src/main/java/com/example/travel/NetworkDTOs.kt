@@ -6,11 +6,10 @@ import com.google.gson.annotations.SerializedName
  * 统一响应格式（适配后端返回的格式）
  */
 data class ApiResponse<T>(
-    val code: Int,
-    val message: String,
-    val data: T?
+    val code: Int = 0,
+    val message: String = "",
+    val data: T? = null
 ) {
-    // 后端用 code 字段表示状态，这里提供 success 属性方便使用
     val success: Boolean get() = code == 200
 }
 
@@ -49,7 +48,9 @@ data class PostBackendResponse(
     val tag: String?,
     val content: String,
     val publishTime: String?,
-    val auditState: String
+    val auditState: String,
+    val likeCount: Int = 0,
+    val favoriteCount: Int = 0
 ) {
     fun toPostResponse(): PostResponse {
         val landscape = if (!landscapeId.isNullOrBlank() && !landscapeTitle.isNullOrBlank()) {
@@ -84,7 +85,9 @@ data class PostBackendResponse(
             auditedAt = null,
             landscapeId = landscapeId,
             landscape = landscape,
-            author = null
+            author = null,
+            likeCount = likeCount,
+            favoriteCount = favoriteCount
         )
     }
 }
@@ -112,12 +115,12 @@ data class SmsSendRequest(
 )
 
 /**
- * 发送验证码响应
+ * 发送验证码响应（与后端 SmsCodeResponse 字段一致，可空避免 Gson 解析失败）
  */
 data class SmsSendResponse(
-    val phone: String,
-    val smsCode: String,
-    val expiresInSeconds: Int
+    val phone: String? = null,
+    val smsCode: String? = null,
+    val expiresInSeconds: Int = 300
 )
 
 /**
@@ -293,7 +296,9 @@ data class PostResponse(
     val auditedAt: String?,
     val landscapeId: String?,
     val landscape: LandscapeResponse? = null,
-    val author: UserSummary?
+    val author: UserSummary?,
+    val likeCount: Int = 0,
+    val favoriteCount: Int = 0
 )
 
 /**

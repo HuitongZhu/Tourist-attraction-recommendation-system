@@ -25,7 +25,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.example.travel.ui.theme.TravelTheme
-import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.launch
 
 class RecommendPostActivity : ComponentActivity() {
@@ -57,11 +56,12 @@ class RecommendPostActivity : ComponentActivity() {
 @Composable
 fun RecommendScreen() {
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     var searchText by remember { mutableStateOf("") }
     var posts by remember { mutableStateOf<List<PostResponse>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
+    var isRefreshing by remember { mutableStateOf(false) }
 
-    // 获取景点名称
     suspend fun fetchLandscapeTitle(landscapeId: String): String? {
         return try {
             val response = NetworkClient.apiService.getLandscapeById(landscapeId)
@@ -75,72 +75,75 @@ fun RecommendScreen() {
         }
     }
 
-    // 搜索函数
-    fun performSearch(keyword: String = "") {
-        isLoading = true
-        // 在协程中执行搜索
-        kotlinx.coroutines.MainScope().launch {
-            try {
-                // 调用后端搜索接口
-                val response = NetworkClient.apiService.getPosts(
-                    keyword = if (keyword.isBlank()) null else keyword,
-                    status = "审核通过"
-                )
-                if (response.success && response.data != null) {
-                    var postList = response.data.toPostResponses()
-                    // 为有landscapeId的帖子获取景点名称
-                    postList = postList.map { post ->
-                        if (!post.landscapeId.isNullOrBlank() && post.landscape == null) {
-                            val landscapeTitle = fetchLandscapeTitle(post.landscapeId)
-                            if (landscapeTitle != null) {
-                                post.copy(
-                                    landscape = LandscapeResponse(
-                                        id = post.landscapeId,
-                                        title = landscapeTitle,
-                                        content = "",
-                                        address = "",
-                                        latitude = null,
-                                        longitude = null,
-                                        contactPhone = null,
-                                        openingTime = null,
-                                        level = null,
-                                        status = "审核通过",
-                                        auditRemark = null,
-                                        publishedAt = null,
-                                        auditedAt = null,
-                                        creator = null
-                                    )
+    suspend fun performSearch(keyword: String = searchText, showFullLoading: Boolean = true) {
+        if (showFullLoading) isLoading = true
+        try {
+            val response = NetworkClient.apiService.getPosts(
+                keyword = if (keyword.isBlank()) null else keyword,
+                status = "审核通过"
+            )
+            if (response.success && response.data != null) {
+                var postList = response.data.toPostResponses()
+                postList = postList.map { post ->
+                    if (!post.landscapeId.isNullOrBlank() && post.landscape == null) {
+                        val landscapeTitle = fetchLandscapeTitle(post.landscapeId)
+                        if (landscapeTitle != null) {
+                            post.copy(
+                                landscape = LandscapeResponse(
+                                    id = post.landscapeId,
+                                    title = landscapeTitle,
+                                    content = "",
+                                    address = "",
+                                    latitude = null,
+                                    longitude = null,
+                                    contactPhone = null,
+                                    openingTime = null,
+                                    level = null,
+                                    status = "审核通过",
+                                    auditRemark = null,
+                                    publishedAt = null,
+                                    auditedAt = null,
+                                    creator = null
                                 )
-                            } else {
-                                post
-                            }
+                            )
                         } else {
                             post
                         }
+                    } else {
+                        post
                     }
-                    posts = postList
-                } else {
-                    posts = emptyList()
                 }
-            } catch (e: Exception) {
-                Toast.makeText(context, "搜索失败: ${e.message}", Toast.LENGTH_SHORT).show()
+                posts = postList
+            } else {
                 posts = emptyList()
-            } finally {
-                isLoading = false
             }
+        } catch (e: Exception) {
+            Toast.makeText(context, "搜索失败: ${e.message}", Toast.LENGTH_SHORT).show()
+            posts = emptyList()
+        } finally {
+            isLoading = false
+            isRefreshing = false
         }
     }
 
     LaunchedEffect(Unit) {
-        // 初始化加载所有审核通过的推荐帖
-        performSearch()
+        performSearch("")
     }
-    
-    LazyColumn(
-        modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
+
+    PullToRefreshBox(
+        isRefreshing = isRefreshing,
+        onRefresh = {
+            scope.launch {
+                isRefreshing = true
+                performSearch(showFullLoading = false)
+            }
+        }
     ) {
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
         item {
             Text(text = "推荐贴", fontSize = 24.sp, fontWeight = FontWeight.Bold)
             Spacer(modifier = Modifier.height(16.dp))
@@ -159,7 +162,7 @@ fun RecommendScreen() {
                     singleLine = true,
                     shape = RoundedCornerShape(8.dp),
                     trailingIcon = {
-                        IconButton(onClick = { performSearch(searchText) }) {
+                        IconButton(onClick = { scope.launch { performSearch(searchText) } }) {
                             Text("搜索", color = Color.Blue, fontWeight = FontWeight.Bold)
                         }
                     }
@@ -168,7 +171,7 @@ fun RecommendScreen() {
             Spacer(modifier = Modifier.height(16.dp))
         }
 
-        if (isLoading) {
+        if (isLoading && posts.isEmpty()) {
             item {
                 Box(modifier = Modifier.fillMaxWidth().padding(20.dp), contentAlignment = Alignment.Center) {
                     CircularProgressIndicator()
@@ -237,5 +240,6 @@ fun RecommendScreen() {
                 }
             }
         }
+    }
     }
 }

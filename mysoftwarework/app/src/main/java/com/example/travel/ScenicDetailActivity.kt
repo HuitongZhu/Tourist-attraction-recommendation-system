@@ -9,6 +9,8 @@ import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -79,6 +81,55 @@ private suspend fun loadAdminLandscapeDetail(landscapeId: String): LandscapeResp
     return null
 }
 
+/**
+ * 计算两个经纬度之间的距离（单位：米）
+ * 使用 Haversine 公式
+ */
+private fun calculateDistance(
+    lat1: Double, lon1: Double,
+    lat2: Double, lon2: Double
+): Double {
+    val earthRadius = 6371000.0 // 地球半径（米）
+    val dLat = Math.toRadians(lat2 - lat1)
+    val dLon = Math.toRadians(lon2 - lon1)
+    val a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+            Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2)) *
+            Math.sin(dLon / 2) * Math.sin(dLon / 2)
+    val c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+    return earthRadius * c
+}
+
+/**
+ * 获取相关推荐景点（按距离排序）
+ */
+private suspend fun getRelatedLandscapes(
+    currentLandscapeId: String,
+    currentLat: Double?,
+    currentLon: Double?
+): List<LandscapeBackendResponse> {
+    if (currentLat == null || currentLon == null || currentLat == 0.0 || currentLon == 0.0) {
+        return emptyList()
+    }
+    try {
+        val response = NetworkClient.apiService.getApprovedLandscapes()
+        if (response.success && response.data != null) {
+            return response.data
+                .filter { it.landscapeId != currentLandscapeId }
+                .filter { it.latitude != null && it.longitude != null && it.latitude != 0.0 && it.longitude != 0.0 }
+                .map {
+                    val distance = calculateDistance(currentLat, currentLon, it.latitude!!, it.longitude!!)
+                    it to distance
+                }
+                .sortedBy { it.second }
+                .map { it.first }
+                .take(3)
+        }
+    } catch (e: Exception) {
+        Log.e("ScenicDetail", "Error loading related landscapes: ${e.message}", e)
+    }
+    return emptyList()
+}
+
 class ScenicDetailActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -97,8 +148,11 @@ class ScenicDetailActivity : ComponentActivity() {
 fun ScenicDetailScreen(landscapeId: String, adminPreview: Boolean = false) {
     val scope = rememberCoroutineScope()
     var comments by remember { mutableStateOf<List<CommentResponse>>(emptyList()) }
+    var refreshKey by remember { mutableIntStateOf(0) }
+    var isRefreshing by remember { mutableStateOf(false) }
 
-    suspend fun loadComments() {
+    suspend fun reloadAll() {
+        isRefreshing = true
         try {
             val res = NetworkClient.apiService.getComments(landscapeId = landscapeId, size = 200)
             if (res.success) {
@@ -107,10 +161,12 @@ fun ScenicDetailScreen(landscapeId: String, adminPreview: Boolean = false) {
         } catch (e: Exception) {
             Log.e("ScenicDetail", "Error loading comments: ${e.message}", e)
         }
+        refreshKey++
+        isRefreshing = false
     }
 
     LaunchedEffect(landscapeId) {
-        loadComments()
+        reloadAll()
     }
 
     Scaffold(
@@ -118,16 +174,21 @@ fun ScenicDetailScreen(landscapeId: String, adminPreview: Boolean = false) {
             CommentInputBar(
                 landscapeId = landscapeId,
                 postId = null,
-                onCommentPosted = { scope.launch { loadComments() } }
+                onCommentPosted = { scope.launch { reloadAll() } }
             )
         }
     ) { innerPadding ->
-        Box(modifier = Modifier.padding(innerPadding).fillMaxSize()) {
+        PullToRefreshBox(
+            isRefreshing = isRefreshing,
+            onRefresh = { scope.launch { reloadAll() } },
+            modifier = Modifier.padding(innerPadding)
+        ) {
             ScenicDetailContent(
                 landscapeId = landscapeId,
                 adminPreview = adminPreview,
                 comments = comments,
-                onCommentDeleted = { scope.launch { loadComments() } }
+                refreshKey = refreshKey,
+                onCommentDeleted = { scope.launch { reloadAll() } }
             )
         }
     }
@@ -138,6 +199,7 @@ fun ScenicDetailContent(
     landscapeId: String,
     adminPreview: Boolean = false,
     comments: List<CommentResponse>,
+    refreshKey: Int,
     onCommentDeleted: () -> Unit
 ) {
     val context = LocalContext.current
@@ -148,8 +210,9 @@ fun ScenicDetailContent(
     var isFavorited by remember { mutableStateOf(false) }
     var likeCount by remember { mutableStateOf(0) }
     var favoriteCount by remember { mutableStateOf(0) }
+    var relatedLandscapes by remember { mutableStateOf<List<LandscapeBackendResponse>>(emptyList()) }
 
-    LaunchedEffect(landscapeId, adminPreview) {
+    LaunchedEffect(landscapeId, adminPreview, refreshKey) {
         detailLoading = true
         try {
             if (adminPreview) {
@@ -177,11 +240,27 @@ fun ScenicDetailContent(
                     }
                 }
             }
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            // 协程被取消，这是正常的生命周期事件，不需要处理
         } catch (e: Exception) {
             Log.e("ScenicDetail", "Error loading landscape: ${e.message}", e)
             Toast.makeText(context, "网络连接失败: ${e.message}", Toast.LENGTH_SHORT).show()
         } finally {
             detailLoading = false
+        }
+    }
+
+    // 加载相关推荐景点
+    LaunchedEffect(landscape) {
+        if (landscape != null) {
+            try {
+                val result = getRelatedLandscapes(landscapeId, landscape!!.latitude, landscape!!.longitude)
+                relatedLandscapes = result
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                // 协程被取消，这是正常的生命周期事件，不需要处理
+            } catch (e: Exception) {
+                Log.e("ScenicDetail", "Error loading related landscapes: ${e.message}", e)
+            }
         }
     }
 
@@ -335,11 +414,41 @@ fun ScenicDetailContent(
                         modifier = Modifier.fillMaxWidth()
                     )
                 }
-            }
+        }
 
+        // 相关推荐
+        if (relatedLandscapes.isNotEmpty()) {
             Divider(modifier = Modifier.padding(vertical = 20.dp))
-            
-            Text(text = "游客评论 (${comments.size})", fontSize = 20.sp, fontWeight = FontWeight.Bold)
+            Text(text = "相关推荐", fontSize = 20.sp, fontWeight = FontWeight.Bold)
+            Spacer(modifier = Modifier.height(10.dp))
+            LazyRow(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                items(relatedLandscapes) { related ->
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = related.title,
+                            fontSize = 16.sp,
+                            color = Color(0xFF1A56DB),
+                            modifier = Modifier
+                                .clickable {
+                                    // 跳转到相关景点详情页
+                                    val intent = android.content.Intent(context, ScenicDetailActivity::class.java)
+                                    intent.putExtra("landscapeId", related.landscapeId)
+                                    context.startActivity(intent)
+                                }
+                                .background(Color(0xFFF0F5FF), RoundedCornerShape(4.dp))
+                                .padding(horizontal = 12.dp, vertical = 4.dp)
+                        )
+                    }
+                }
+            }
+        }
+
+        Divider(modifier = Modifier.padding(vertical = 20.dp))
+        
+        Text(text = "游客评论 (${comments.size})", fontSize = 20.sp, fontWeight = FontWeight.Bold)
             
             if (comments.isEmpty()) {
                 Text("暂无评论，快来抢沙发吧~", modifier = Modifier.padding(vertical = 20.dp), color = Color.Gray)

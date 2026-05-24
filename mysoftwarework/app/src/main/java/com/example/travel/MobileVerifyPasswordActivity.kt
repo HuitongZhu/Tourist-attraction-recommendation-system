@@ -1,5 +1,6 @@
 package com.example.travel
 
+import android.content.Intent
 import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.ComponentActivity
@@ -39,7 +40,7 @@ class MobileVerifyPasswordActivity : ComponentActivity() {
                                     context = this@MobileVerifyPasswordActivity,
                                     phone = phone,
                                     type = SmsCodeType.PASSWORD,
-                                    onError = { msg ->
+                                    onMessage = { msg ->
                                         Toast.makeText(this@MobileVerifyPasswordActivity, msg, Toast.LENGTH_SHORT).show()
                                     }
                                 )
@@ -51,6 +52,10 @@ class MobileVerifyPasswordActivity : ComponentActivity() {
                                     val response = NetworkClient.apiService.resetPasswordBySms(phone, code, newPassword)
                                     if (response.success) {
                                         Toast.makeText(this@MobileVerifyPasswordActivity, "密码修改成功", Toast.LENGTH_SHORT).show()
+                                        // 跳转到个人中心页面
+                                        val intent = Intent(this@MobileVerifyPasswordActivity, PersonalHomeActivity::class.java)
+                                        intent.flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_NEW_TASK
+                                        startActivity(intent)
                                         finish()
                                     } else {
                                         Toast.makeText(this@MobileVerifyPasswordActivity, "修改失败: ${response.message}", Toast.LENGTH_SHORT).show()
@@ -155,22 +160,20 @@ fun MobileVerifyPasswordScreen(
         Spacer(modifier = Modifier.height(16.dp))
 
         // 新密码
-        OutlinedTextField(
+        PasswordTextField(
             value = newPassword,
             onValueChange = { newPassword = it },
-            label = { Text("设置新密码") },
-            visualTransformation = PasswordVisualTransformation(),
+            label = "设置新密码",
             modifier = Modifier.fillMaxWidth(0.85f)
         )
 
         Spacer(modifier = Modifier.height(16.dp))
 
         // 确认密码
-        OutlinedTextField(
+        PasswordTextField(
             value = confirmPassword,
             onValueChange = { confirmPassword = it },
-            label = { Text("再次确认新密码") },
-            visualTransformation = PasswordVisualTransformation(),
+            label = "再次确认新密码",
             modifier = Modifier.fillMaxWidth(0.85f)
         )
 

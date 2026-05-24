@@ -18,13 +18,14 @@ interface ApiService {
     ): retrofit2.Response<okhttp3.ResponseBody>
 
     @FormUrlEncoded
-    @POST("/api/register")
+    @POST("/api/register/submit")
     suspend fun register(
         @Field("userName") userName: String,
         @Field("account") account: String,
         @Field("password") password: String,
-        @Field("confirm_password") confirmPassword: String
-    ): retrofit2.Response<okhttp3.ResponseBody>
+        @Field("confirm_password") confirmPassword: String,
+        @Field("code") code: String
+    ): ApiResponse<String>
 
     /** 统一发送验证码（返回 smsCode 供弹窗展示）type: login|register|password|delete|forgot */
     @FormUrlEncoded
@@ -54,6 +55,11 @@ interface ApiService {
     @FormUrlEncoded
     @POST("/api/register/verify-code")
     suspend fun verifyRegisterCode(@Field("phone") phone: String, @Field("code") code: String): retrofit2.Response<okhttp3.ResponseBody>
+
+    // 验证注销验证码
+    @FormUrlEncoded
+    @POST("/api/users/verify-sms-code")
+    suspend fun verifyDeleteSmsCode(@Field("phone") phone: String, @Field("code") code: String): ApiResponse<Unit>
 
     // --- 景点模块 ---
     @GET("/api/landscapes/home")
@@ -332,6 +338,21 @@ interface ApiService {
     suspend fun updateMyLandscape(
         @Path("id") id: String,
         @Body request: LandscapeRequest
+    ): ApiResponse<LandscapeBackendResponse>
+
+    @Multipart
+    @PUT("/api/my/landscapes/{id}/image")
+    suspend fun updateMyLandscapeWithImage(
+        @Path("id") landscapeId: String,
+        @Part("title") title: RequestBody?,
+        @Part("content") content: RequestBody?,
+        @Part("address") address: RequestBody?,
+        @Part("latitude") latitude: RequestBody?,
+        @Part("longitude") longitude: RequestBody?,
+        @Part("contactPhone") contactPhone: RequestBody?,
+        @Part("openingTime") openingTime: RequestBody?,
+        @Part("level") level: RequestBody?,
+        @Part image: MultipartBody.Part?
     ): ApiResponse<LandscapeBackendResponse>
 
     @DELETE("/api/my/landscapes/{id}")

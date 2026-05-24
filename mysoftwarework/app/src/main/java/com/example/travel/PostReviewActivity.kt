@@ -183,90 +183,95 @@ fun PostReviewItem(post: PostResponse, onAudit: () -> Unit) {
             Spacer(modifier = Modifier.height(12.dp))
             Text(text = post.content, fontSize = 18.sp, color = Color.Gray, lineHeight = 24.sp, maxLines = 4)
             Spacer(modifier = Modifier.height(24.dp))
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                OutlinedButton(
-                    onClick = {
-                        val intent = Intent(context, PostDetailActivity::class.java)
-                        intent.putExtra("postId", post.id)
-                        intent.putExtra("adminPreview", true)
-                        context.startActivity(intent)
-                    },
-                    modifier = Modifier.weight(1f).height(54.dp),
-                    shape = RoundedCornerShape(27.dp),
-                    border = BorderStroke(1.dp, Color(0xFF1A56DB))
-                ) {
-                    Icon(Icons.Default.Info, contentDescription = null, modifier = Modifier.size(20.dp), tint = Color(0xFF1A56DB))
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text("查看详情", color = Color(0xFF1A56DB), fontSize = 18.sp)
-                }
-                if (pending) {
-                    Button(
-                        onClick = {
-                            scope.launch {
-                                try {
-                                    val res = NetworkClient.apiService.auditPost(
-                                        post.id,
-                                        AuditRequest(approved = true, remark = "审核通过")
-                                    )
-                                    if (res.success) {
-                                        Toast.makeText(context, "审核通过", Toast.LENGTH_SHORT).show()
-                                        onAudit()
-                                    } else {
-                                        Toast.makeText(context, res.message ?: "操作失败", Toast.LENGTH_SHORT).show()
+            // 两行按钮布局：第一行通过、驳回，第二行详情、删除
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                // 第一行：通过、驳回
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    if (pending) {
+                        // 通过按钮 - 蓝色实心文字按钮
+                        Button(
+                            onClick = {
+                                scope.launch {
+                                    try {
+                                        val res = NetworkClient.apiService.auditPost(
+                                            post.id,
+                                            AuditRequest(approved = true, remark = "审核通过")
+                                        )
+                                        if (res.success) {
+                                            Toast.makeText(context, "审核通过", Toast.LENGTH_SHORT).show()
+                                            onAudit()
+                                        } else {
+                                            Toast.makeText(context, res.message ?: "操作失败", Toast.LENGTH_SHORT).show()
+                                        }
+                                    } catch (e: Exception) {
+                                        Toast.makeText(context, "操作失败", Toast.LENGTH_SHORT).show()
                                     }
-                                } catch (e: Exception) {
-                                    Toast.makeText(context, "操作失败", Toast.LENGTH_SHORT).show()
                                 }
-                            }
-                        },
-                        modifier = Modifier.weight(1f).height(54.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1A56DB)),
-                        shape = RoundedCornerShape(27.dp)
-                    ) {
-                        Icon(Icons.Default.Check, contentDescription = null, Modifier.size(20.dp))
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text("通过", fontSize = 18.sp)
+                            },
+                            modifier = Modifier.weight(1f).height(54.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1A56DB)),
+                            shape = RoundedCornerShape(27.dp)
+                        ) {
+                            Text("通过", fontSize = 18.sp)
+                        }
+                        // 驳回按钮 - 红色边框文字按钮
+                        Button(
+                            onClick = {
+                                scope.launch {
+                                    try {
+                                        val res = NetworkClient.apiService.auditPost(
+                                            post.id,
+                                            AuditRequest(approved = false, remark = "审核未通过")
+                                        )
+                                        if (res.success) {
+                                            Toast.makeText(context, "已驳回", Toast.LENGTH_SHORT).show()
+                                            onAudit()
+                                        } else {
+                                            Toast.makeText(context, res.message ?: "操作失败", Toast.LENGTH_SHORT).show()
+                                        }
+                                    } catch (e: Exception) {
+                                        Toast.makeText(context, "操作失败", Toast.LENGTH_SHORT).show()
+                                    }
+                                }
+                            },
+                            modifier = Modifier.weight(1f).height(54.dp),
+                            shape = RoundedCornerShape(27.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = Color.White),
+                            border = BorderStroke(1.dp, Color.Red)
+                        ) {
+                            Text("驳回", color = Color.Red, fontSize = 18.sp)
+                        }
+                    } else {
+                        // 已审核状态，显示占位
+                        Spacer(modifier = Modifier.weight(1f))
+                        Spacer(modifier = Modifier.weight(1f))
                     }
                 }
-                if (approved) {
+                // 第二行：详情、删除
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    // 详情按钮 - 蓝色边框文字按钮
                     OutlinedButton(
+                        onClick = {
+                            val intent = Intent(context, PostDetailActivity::class.java)
+                            intent.putExtra("postId", post.id)
+                            intent.putExtra("adminPreview", true)
+                            context.startActivity(intent)
+                        },
+                        modifier = Modifier.weight(1f).height(54.dp),
+                        shape = RoundedCornerShape(27.dp),
+                        border = BorderStroke(1.dp, Color(0xFF1A56DB))
+                    ) {
+                        Text("详情", color = Color(0xFF1A56DB), fontSize = 18.sp)
+                    }
+                    // 删除按钮 - 红色实心文字按钮
+                    Button(
                         onClick = { showDeleteDialog = true },
                         modifier = Modifier.weight(1f).height(54.dp),
                         shape = RoundedCornerShape(27.dp),
-                        border = BorderStroke(1.dp, Color.Red)
+                        colors = ButtonDefaults.buttonColors(containerColor = Color.Red)
                     ) {
-                        Icon(Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(20.dp), tint = Color.Red)
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text("删除", color = Color.Red, fontSize = 18.sp)
+                        Text("删除", fontSize = 18.sp)
                     }
-                }
-            }
-            if (pending) {
-                Spacer(modifier = Modifier.height(12.dp))
-                OutlinedButton(
-                    onClick = {
-                        scope.launch {
-                            try {
-                                val res = NetworkClient.apiService.auditPost(
-                                    post.id,
-                                    AuditRequest(approved = false, remark = "审核未通过")
-                                )
-                                if (res.success) {
-                                    Toast.makeText(context, "已驳回", Toast.LENGTH_SHORT).show()
-                                    onAudit()
-                                } else {
-                                    Toast.makeText(context, res.message ?: "操作失败", Toast.LENGTH_SHORT).show()
-                                }
-                            } catch (e: Exception) {
-                                Toast.makeText(context, "操作失败", Toast.LENGTH_SHORT).show()
-                            }
-                        }
-                    },
-                    modifier = Modifier.fillMaxWidth().height(54.dp),
-                    shape = RoundedCornerShape(27.dp),
-                    border = BorderStroke(1.dp, Color.Red)
-                ) {
-                    Text("驳回审核", color = Color.Red, fontSize = 18.sp)
                 }
             }
         }

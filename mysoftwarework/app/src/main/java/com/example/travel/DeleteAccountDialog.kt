@@ -70,12 +70,10 @@ fun DeleteAccountDialog(
                         if (verifyMethod == VerifyMethod.PASSWORD) {
                             Text("请输入当前密码进行验证", color = Color.Gray, fontSize = 14.sp)
                             Spacer(modifier = Modifier.height(16.dp))
-                            OutlinedTextField(
+                            PasswordTextField(
                                 value = password,
                                 onValueChange = { password = it },
-                                label = { Text("密码") },
-                                visualTransformation = PasswordVisualTransformation(),
-                                keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = KeyboardType.Password),
+                                label = "密码",
                                 modifier = Modifier.fillMaxWidth()
                             )
                         } else {
@@ -110,7 +108,7 @@ fun DeleteAccountDialog(
                                                         context = context,
                                                         phone = phone,
                                                         type = SmsCodeType.DELETE,
-                                                        onError = { msg -> errorMessage = msg }
+                                                        onMessage = { msg -> errorMessage = msg }
                                                     )
                                                 } catch (e: Exception) {
                                                     errorMessage = "网络异常"
@@ -164,6 +162,12 @@ fun DeleteAccountDialog(
                                         } else {
                                             errorMessage = response.message ?: "密码错误"
                                         }
+                                    } catch (e: retrofit2.HttpException) {
+                                        when (e.code()) {
+                                            404 -> errorMessage = "服务暂未开放此功能"
+                                            401 -> errorMessage = "密码错误"
+                                            else -> errorMessage = "验证失败: ${e.code()}"
+                                        }
                                     } catch (e: Exception) {
                                         errorMessage = "网络异常"
                                     } finally {
@@ -178,17 +182,13 @@ fun DeleteAccountDialog(
                                 isLoading = true
                                 coroutineScope.launch {
                                     try {
-                                        val response = NetworkClient.apiService.verifyRegisterCode(phone, smsCode)
-                                        if (response.isSuccessful) {
-                                            val body = response.body()?.string()
-                                            if (body?.contains("\"success\":true") == true) {
-                                                step = 3
-                                                canProceed = true
-                                            } else {
-                                                errorMessage = "验证码错误"
-                                            }
+                                        // 使用正确的注销验证码验证接口
+                                        val response = NetworkClient.apiService.verifyDeleteSmsCode(phone, smsCode)
+                                        if (response.success) {
+                                            step = 3
+                                            canProceed = true
                                         } else {
-                                            errorMessage = "验证失败"
+                                            errorMessage = response.message ?: "验证码错误"
                                         }
                                     } catch (e: Exception) {
                                         errorMessage = "网络异常"

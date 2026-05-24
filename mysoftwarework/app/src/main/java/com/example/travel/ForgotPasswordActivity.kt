@@ -151,7 +151,7 @@ fun ForgotPasswordScreen(
                                         context = context,
                                         phone = account,
                                         type = SmsCodeType.FORGOT,
-                                        onError = { msg -> errorMessage = msg }
+                                        onMessage = { msg -> errorMessage = msg }
                                     )
                                 } catch (e: Exception) {
                                     errorMessage = "网络异常"
@@ -203,13 +203,11 @@ fun ForgotPasswordScreen(
             }
 
             ForgotPasswordStep.INPUT_PASSWORD -> {
-                OutlinedTextField(
+                PasswordTextField(
                     value = newPassword,
                     onValueChange = { newPassword = it },
-                    label = { Text("新密码") },
-                    placeholder = { Text("请输入新密码（至少6位）") },
-                    visualTransformation = PasswordVisualTransformation(),
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                    label = "新密码",
+                    placeholder = "请输入新密码（至少6位）",
                     modifier = Modifier.fillMaxWidth(0.8f)
                 )
                 Spacer(modifier = Modifier.height(20.dp))
@@ -233,12 +231,10 @@ fun ForgotPasswordScreen(
             }
 
             ForgotPasswordStep.CONFIRM_PASSWORD -> {
-                OutlinedTextField(
+                PasswordTextField(
                     value = confirmPassword,
                     onValueChange = { confirmPassword = it },
-                    label = { Text("确认新密码") },
-                    visualTransformation = PasswordVisualTransformation(),
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                    label = "确认新密码",
                     modifier = Modifier.fillMaxWidth(0.8f)
                 )
                 Spacer(modifier = Modifier.height(20.dp))

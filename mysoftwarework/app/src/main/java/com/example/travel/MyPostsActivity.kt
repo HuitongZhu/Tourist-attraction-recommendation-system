@@ -54,13 +54,15 @@ fun MyPostsScreen(
     onBack: () -> Unit
 ) {
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     var posts by remember { mutableStateOf<List<PostBackendResponse>>(emptyList()) }
     var loading by remember { mutableStateOf(true) }
+    var isRefreshing by remember { mutableStateOf(false) }
     var expandedId by remember { mutableStateOf<String?>(null) }
     var deleteTarget by remember { mutableStateOf<PostBackendResponse?>(null) }
 
-    suspend fun reload() {
-        loading = true
+    suspend fun reload(showFullLoading: Boolean = true) {
+        if (showFullLoading) loading = true
         try {
             val res = NetworkClient.apiService.getMyPosts()
             if (res.success) {
@@ -72,6 +74,7 @@ fun MyPostsScreen(
             Toast.makeText(context, "加载失败: ${e.message}", Toast.LENGTH_SHORT).show()
         } finally {
             loading = false
+            isRefreshing = false
         }
     }
 
@@ -130,20 +133,23 @@ fun MyPostsScreen(
             )
         }
     ) { padding ->
-        Box(
+        PullToRefreshBox(
+            isRefreshing = isRefreshing,
+            onRefresh = { scope.launch { isRefreshing = true; reload(showFullLoading = false) } },
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
                 .padding(16.dp)
         ) {
-            when {
-                loading -> CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
-                posts.isEmpty() -> Text(
-                    text = "暂无发布的推荐帖",
-                    color = Color.Gray,
-                    modifier = Modifier.align(Alignment.Center)
-                )
-                else -> LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Box(modifier = Modifier.fillMaxSize()) {
+                when {
+                    loading && posts.isEmpty() -> CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
+                    posts.isEmpty() -> Text(
+                        text = "暂无发布的推荐帖",
+                        color = Color.Gray,
+                        modifier = Modifier.align(Alignment.Center)
+                    )
+                    else -> LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     items(posts, key = { it.recomId }) { post ->
                         MyPostListItem(
                             post = post,
@@ -155,6 +161,7 @@ fun MyPostsScreen(
                         )
                     }
                 }
+            }
             }
         }
     }
@@ -204,6 +211,12 @@ private fun MyPostListItem(
             }
             post.publishTime?.let {
                 Text("发布时间：$it", fontSize = 13.sp, color = Color.Gray, modifier = Modifier.padding(top = 2.dp))
+            }
+            // 点赞数和收藏数
+            Row(modifier = Modifier.padding(top = 4.dp)) {
+                Text("点赞：${post.likeCount}", fontSize = 13.sp, color = Color.Gray)
+                Spacer(modifier = Modifier.width(16.dp))
+                Text("收藏：${post.favoriteCount}", fontSize = 13.sp, color = Color.Gray)
             }
             Column(
                 modifier = Modifier

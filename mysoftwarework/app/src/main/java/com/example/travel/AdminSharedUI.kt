@@ -1,6 +1,7 @@
 package com.example.travel
 
 import android.content.Intent
+import android.widget.Toast
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -133,6 +134,24 @@ fun AdminSidebar(selectedModule: String, onModuleSelect: ((String) -> Unit)? = n
                 }
             }
         )
+
+        androidx.compose.material3.OutlinedButton(
+            onClick = {
+                UserSession.clear(context)
+                Toast.makeText(context, "已退出登录", Toast.LENGTH_SHORT).show()
+                val intent = Intent(context, LoginActivity::class.java)
+                intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+                context.startActivity(intent)
+            },
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(8.dp)
+        ) {
+            Text(
+                text = "退出登录",
+                fontSize = 15.sp,
+                color = Color.Gray
+            )
+        }
     }
 }
 

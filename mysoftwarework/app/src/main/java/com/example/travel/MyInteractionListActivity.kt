@@ -23,6 +23,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.travel.ui.theme.TravelTheme
+import kotlinx.coroutines.launch
 
 class MyInteractionListActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -57,18 +58,21 @@ class MyInteractionListActivity : ComponentActivity() {
 @Composable
 fun MyInteractionListScreen(listType: String, onBack: () -> Unit) {
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     var landscapes by remember { mutableStateOf<List<LandscapeBackendResponse>>(emptyList()) }
     var posts by remember { mutableStateOf<List<PostBackendResponse>>(emptyList()) }
     var loading by remember { mutableStateOf(true) }
+    var isRefreshing by remember { mutableStateOf(false) }
     val isLandscapeList = listType == MyInteractionListActivity.TYPE_LANDSCAPE_LIKES ||
             listType == MyInteractionListActivity.TYPE_LANDSCAPE_FAVORITES
 
-    LaunchedEffect(listType) {
-        loading = true
+    suspend fun reload(showFullLoading: Boolean = true) {
+        if (showFullLoading) loading = true
         if (!UserSession.isLoggedIn()) {
             Toast.makeText(context, "请先登录", Toast.LENGTH_SHORT).show()
             loading = false
-            return@LaunchedEffect
+            isRefreshing = false
+            return
         }
         try {
             when (listType) {
@@ -94,7 +98,12 @@ fun MyInteractionListScreen(listType: String, onBack: () -> Unit) {
             Toast.makeText(context, "加载失败", Toast.LENGTH_SHORT).show()
         } finally {
             loading = false
+            isRefreshing = false
         }
+    }
+
+    LaunchedEffect(listType) {
+        reload()
     }
 
     Scaffold(
@@ -110,30 +119,33 @@ fun MyInteractionListScreen(listType: String, onBack: () -> Unit) {
             )
         }
     ) { padding ->
-        Box(
+        PullToRefreshBox(
+            isRefreshing = isRefreshing,
+            onRefresh = { scope.launch { isRefreshing = true; reload(showFullLoading = false) } },
             modifier = Modifier
                 .padding(padding)
                 .fillMaxSize()
         ) {
-            when {
-                loading -> {
-                    CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
-                }
-                isLandscapeList && landscapes.isEmpty() -> {
-                    Text(
-                        "暂无内容",
-                        modifier = Modifier.align(Alignment.Center),
-                        color = Color.Gray
-                    )
-                }
-                !isLandscapeList && posts.isEmpty() -> {
-                    Text(
-                        "暂无内容",
-                        modifier = Modifier.align(Alignment.Center),
-                        color = Color.Gray
-                    )
-                }
-                isLandscapeList -> {
+            Box(modifier = Modifier.fillMaxSize()) {
+                when {
+                    loading && landscapes.isEmpty() && posts.isEmpty() -> {
+                        CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
+                    }
+                    isLandscapeList && landscapes.isEmpty() -> {
+                        Text(
+                            "暂无内容",
+                            modifier = Modifier.align(Alignment.Center),
+                            color = Color.Gray
+                        )
+                    }
+                    !isLandscapeList && posts.isEmpty() -> {
+                        Text(
+                            "暂无内容",
+                            modifier = Modifier.align(Alignment.Center),
+                            color = Color.Gray
+                        )
+                    }
+                    isLandscapeList -> {
                     LazyColumn(
                         modifier = Modifier.fillMaxSize(),
                         contentPadding = PaddingValues(16.dp),
@@ -189,6 +201,7 @@ fun MyInteractionListScreen(listType: String, onBack: () -> Unit) {
                         }
                     }
                 }
+            }
             }
         }
     }

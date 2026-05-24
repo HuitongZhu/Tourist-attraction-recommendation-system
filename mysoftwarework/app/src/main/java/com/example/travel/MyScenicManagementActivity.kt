@@ -10,14 +10,18 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -67,23 +71,25 @@ fun MyScenicManagementScreen(refreshTrigger: Int, onBack: () -> Unit) {
     val activity = context as? ComponentActivity
     var landscapes by remember { mutableStateOf<List<LandscapeBackendResponse>>(emptyList()) }
     var loading by remember { mutableStateOf(true) }
+    var isRefreshing by remember { mutableStateOf(false) }
     var deleteTarget by remember { mutableStateOf<LandscapeBackendResponse?>(null) }
+    var searchQuery by remember { mutableStateOf("") }
+    val scope = rememberCoroutineScope()
 
-    fun reload() {
-        activity?.lifecycleScope?.launch {
-            loading = true
-            try {
-                val res = NetworkClient.apiService.getMyLandscapes()
-                if (res.success) {
-                    landscapes = res.data ?: emptyList()
-                } else {
-                    Toast.makeText(context, res.message ?: "加载失败", Toast.LENGTH_SHORT).show()
-                }
-            } catch (e: Exception) {
-                Toast.makeText(context, "加载失败: ${e.message}", Toast.LENGTH_SHORT).show()
-            } finally {
-                loading = false
+    suspend fun reload(showFullLoading: Boolean = true) {
+        if (showFullLoading) loading = true
+        try {
+            val res = NetworkClient.apiService.getMyLandscapes()
+            if (res.success) {
+                landscapes = res.data ?: emptyList()
+            } else {
+                Toast.makeText(context, res.message ?: "加载失败", Toast.LENGTH_SHORT).show()
             }
+        } catch (e: Exception) {
+            Toast.makeText(context, "加载失败: ${e.message}", Toast.LENGTH_SHORT).show()
+        } finally {
+            loading = false
+            isRefreshing = false
         }
     }
 
@@ -139,33 +145,71 @@ fun MyScenicManagementScreen(refreshTrigger: Int, onBack: () -> Unit) {
             )
         }
     ) { padding ->
-        Box(
+        PullToRefreshBox(
+            isRefreshing = isRefreshing,
+            onRefresh = { scope.launch { isRefreshing = true; reload(showFullLoading = false) } },
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
                 .padding(16.dp)
         ) {
-            when {
-                loading -> CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
-                landscapes.isEmpty() -> Text(
-                    text = "暂无发布的景点信息",
-                    color = Color.Gray,
-                    modifier = Modifier.align(Alignment.Center)
-                )
-                else -> LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    items(landscapes, key = { it.landscapeId }) { scenic ->
-                        MyScenicListItem(
-                            scenic = scenic,
-                            onEdit = {
-                                context.startActivity(
-                                    Intent(context, EditScenicActivity::class.java)
-                                        .putExtra(EditScenicActivity.EXTRA_LANDSCAPE_ID, scenic.landscapeId)
-                                )
-                            },
-                            onDelete = { deleteTarget = scenic }
+            Box(modifier = Modifier.fillMaxSize()) {
+                when {
+                    loading && landscapes.isEmpty() -> CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
+                    landscapes.isEmpty() -> Text(
+                        text = "暂无发布的景点信息",
+                        color = Color.Gray,
+                        modifier = Modifier.align(Alignment.Center)
+                    )
+                    else -> LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    // 搜索框
+                    item {
+                        OutlinedTextField(
+                            value = searchQuery,
+                            onValueChange = { searchQuery = it },
+                            placeholder = { Text("搜索景点名称或地点") },
+                            leadingIcon = { Icon(Icons.Default.Search, contentDescription = "搜索") },
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(24.dp),
+                            keyboardOptions = KeyboardOptions.Default,
+                            keyboardActions = KeyboardActions(onDone = {})
                         )
+                        Spacer(modifier = Modifier.height(8.dp))
+                    }
+                    // 过滤后的景点列表
+                    val filteredLandscapes = if (searchQuery.isBlank()) {
+                        landscapes
+                    } else {
+                        landscapes.filter {
+                            it.title.contains(searchQuery, ignoreCase = true) ||
+                            it.address.contains(searchQuery, ignoreCase = true)
+                        }
+                    }
+                    if (filteredLandscapes.isEmpty()) {
+                        item {
+                            Text(
+                                text = "未找到匹配的景点信息",
+                                color = Color.Gray,
+                                modifier = Modifier.fillMaxWidth().padding(vertical = 32.dp),
+                                textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                            )
+                        }
+                    } else {
+                        items(filteredLandscapes, key = { it.landscapeId }) { scenic ->
+                            MyScenicListItem(
+                                scenic = scenic,
+                                onEdit = {
+                                    context.startActivity(
+                                        Intent(context, EditScenicActivity::class.java)
+                                            .putExtra(EditScenicActivity.EXTRA_LANDSCAPE_ID, scenic.landscapeId)
+                                    )
+                                },
+                                onDelete = { deleteTarget = scenic }
+                            )
+                        }
                     }
                 }
+            }
             }
         }
     }

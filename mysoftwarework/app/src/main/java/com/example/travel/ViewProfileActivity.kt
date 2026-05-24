@@ -11,12 +11,14 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.travel.ui.theme.TravelTheme
+import kotlinx.coroutines.launch
 
 class ViewProfileActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -53,10 +55,12 @@ class ViewProfileActivity : ComponentActivity() {
 fun ViewProfileContent(onEdit: () -> Unit) {
     var user by remember { mutableStateOf<UserResponse?>(null) }
     var loading by remember { mutableStateOf(true) }
+    var isRefreshing by remember { mutableStateOf(false) }
     val context = androidx.compose.ui.platform.LocalContext.current
+    val scope = rememberCoroutineScope()
 
-    LaunchedEffect(Unit) {
-        loading = true
+    suspend fun reload(showFullLoading: Boolean = true) {
+        if (showFullLoading) loading = true
         try {
             val data = loadUserProfile()
             if (data != null) {
@@ -68,36 +72,46 @@ fun ViewProfileContent(onEdit: () -> Unit) {
             Toast.makeText(context, "网络错误", Toast.LENGTH_SHORT).show()
         } finally {
             loading = false
+            isRefreshing = false
         }
     }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(16.dp)
-            .verticalScroll(rememberScrollState())
+    LaunchedEffect(Unit) {
+        reload()
+    }
+
+    PullToRefreshBox(
+        isRefreshing = isRefreshing,
+        onRefresh = { scope.launch { isRefreshing = true; reload(showFullLoading = false) } }
     ) {
-        Text("个人资料", fontSize = 24.sp, fontWeight = FontWeight.Bold)
-        Spacer(modifier = Modifier.height(20.dp))
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(16.dp)
+                .verticalScroll(rememberScrollState())
+        ) {
+            Text("个人资料", fontSize = 24.sp, fontWeight = FontWeight.Bold)
+            Spacer(modifier = Modifier.height(20.dp))
 
-        if (loading) {
-            CircularProgressIndicator()
-        } else {
-            val u = user
-            ProfileReadOnlyRow("用户名", u?.userName)
-            ProfileReadOnlyRow("真实姓名", u?.realName)
-            ProfileReadOnlyRow("性别", u?.gender)
-            ProfileReadOnlyRow("生日", u?.birthday)
-            ProfileReadOnlyRow("手机号", u?.phoneNumber)
-            ProfileReadOnlyRow("身份证号", u?.idNumber)
+            if (loading && user == null) {
+                CircularProgressIndicator()
+            } else {
+                val u = user
+                ProfileReadOnlyRow("用户名", u?.userName)
+                ProfileReadOnlyRow("真实姓名", u?.realName)
+                ProfileReadOnlyRow("性别", u?.gender)
+                ProfileReadOnlyRow("生日", u?.birthday)
+                ProfileReadOnlyRow("手机号", u?.phoneNumber)
+                ProfileReadOnlyRow("身份证号", u?.idNumber)
 
-            Spacer(modifier = Modifier.height(24.dp))
-            Button(
-                onClick = onEdit,
-                modifier = Modifier.fillMaxWidth(),
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1A56DB))
-            ) {
-                Text("编辑个人资料")
+                Spacer(modifier = Modifier.height(24.dp))
+                Button(
+                    onClick = onEdit,
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1A56DB))
+                ) {
+                    Text("编辑个人资料")
+                }
             }
         }
     }

@@ -1,28 +1,44 @@
 package com.example.travel
 
+import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.lifecycleScope
+import coil.compose.AsyncImage
 import com.example.travel.ui.theme.TravelTheme
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import okhttp3.MediaType.Companion.toMediaTypeOrNull
+import okhttp3.MultipartBody
+import okhttp3.RequestBody.Companion.asRequestBody
+import okhttp3.RequestBody.Companion.toRequestBody
+import java.io.File
 
 class EditScenicActivity : ComponentActivity() {
     companion object {
@@ -62,11 +78,21 @@ fun EditScenicScreen(landscapeId: String, onBack: () -> Unit) {
     var scenicDetails by remember { mutableStateOf("") }
     var latitude by remember { mutableStateOf<Double?>(null) }
     var longitude by remember { mutableStateOf<Double?>(null) }
+    var latitudeText by remember { mutableStateOf("") }
+    var longitudeText by remember { mutableStateOf("") }
+    var scenicImage by remember { mutableStateOf<String?>(null) }
+    var selectedImageUri by remember { mutableStateOf<Uri?>(null) }
     var levelMenuExpanded by remember { mutableStateOf(false) }
     var loading by remember { mutableStateOf(true) }
     var submitting by remember { mutableStateOf(false) }
 
     val scrollState = rememberScrollState()
+
+    val imagePicker = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        selectedImageUri = uri
+    }
 
     LaunchedEffect(landscapeId) {
         loading = true
@@ -82,6 +108,9 @@ fun EditScenicScreen(landscapeId: String, onBack: () -> Unit) {
                 scenicDetails = d.content
                 latitude = d.latitude
                 longitude = d.longitude
+                latitudeText = d.latitude?.toString() ?: ""
+                longitudeText = d.longitude?.toString() ?: ""
+                scenicImage = d.imagePath
             } else {
                 Toast.makeText(context, res.message ?: "加载失败", Toast.LENGTH_SHORT).show()
                 activity?.finish()
@@ -149,9 +178,92 @@ fun EditScenicScreen(landscapeId: String, onBack: () -> Unit) {
             Spacer(modifier = Modifier.height(16.dp))
 
             FormField("景点名称", scenicName, { scenicName = it }, "请输入景点名称")
+
+            // 景点图片上传区域
+            Column {
+                Text("景点图片", fontSize = 16.sp, fontWeight = FontWeight.Medium)
+                Spacer(modifier = Modifier.height(8.dp))
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(160.dp)
+                        .background(Color(0xFFE8E8E8), RoundedCornerShape(8.dp))
+                        .clickable { imagePicker.launch("image/*") },
+                    contentAlignment = Alignment.Center
+                ) {
+                    // 显示已选图片或现有图片
+                    if (selectedImageUri != null) {
+                        AsyncImage(
+                            model = selectedImageUri,
+                            contentDescription = "已选图片",
+                            modifier = Modifier.fillMaxSize(),
+                            contentScale = ContentScale.Crop
+                        )
+                    } else if (scenicImage != null) {
+                        AsyncImage(
+                            model = "${NetworkClient.BASE_URL}${scenicImage}",
+                            contentDescription = "当前图片",
+                            modifier = Modifier.fillMaxSize(),
+                            contentScale = ContentScale.Crop
+                        )
+                    }
+                    // 始终显示灰色覆盖层和加号
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(Color.Black.copy(alpha = 0.3f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Icon(
+                                Icons.Default.Add,
+                                contentDescription = null,
+                                tint = Color.White,
+                                modifier = Modifier.size(48.dp)
+                            )
+                            Text("点击修改图片", fontSize = 14.sp, color = Color.White)
+                        }
+                    }
+                }
+            }
+
             FormField("景点地点", scenicLocation, { scenicLocation = it }, "请输入详细地点")
             FormField("联系方式", contact, { contact = it }, "请输入联系电话")
             FormField("开放时间", openTime, { openTime = it }, "请输入开放时间")
+
+            // 经纬度输入框
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("纬度", fontSize = 16.sp, fontWeight = FontWeight.Medium)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    OutlinedTextField(
+                        value = latitudeText,
+                        onValueChange = {
+                            latitudeText = it
+                            latitude = it.toDoubleOrNull()
+                        },
+                        placeholder = { Text("请输入纬度") },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(8.dp),
+                        keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Number)
+                    )
+                }
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("经度", fontSize = 16.sp, fontWeight = FontWeight.Medium)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    OutlinedTextField(
+                        value = longitudeText,
+                        onValueChange = {
+                            longitudeText = it
+                            longitude = it.toDoubleOrNull()
+                        },
+                        placeholder = { Text("请输入经度") },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(8.dp),
+                        keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Number)
+                    )
+                }
+            }
 
             Column {
                 Text("景点等级", fontSize = 16.sp, fontWeight = FontWeight.Medium)
@@ -212,22 +324,62 @@ fun EditScenicScreen(landscapeId: String, onBack: () -> Unit) {
                     submitting = true
                     activity?.lifecycleScope?.launch {
                         try {
-                            val request = LandscapeRequest(
-                                title = scenicName.trim(),
-                                content = scenicDetails.trim(),
-                                address = scenicLocation.trim(),
-                                latitude = latitude,
-                                longitude = longitude,
-                                contactPhone = contact.takeIf { it.isNotBlank() },
-                                openingTime = openTime.takeIf { it.isNotBlank() },
-                                level = scenicLevel
-                            )
-                            val res = NetworkClient.apiService.updateMyLandscape(landscapeId, request)
-                            if (res.success) {
-                                Toast.makeText(context, "已提交审核，请等待管理员处理", Toast.LENGTH_SHORT).show()
-                                activity.finish()
+                            // 如果选择了新图片，使用multipart接口
+                            if (selectedImageUri != null) {
+                                val file = selectedImageUri?.let { uri ->
+                                    context.contentResolver.openInputStream(uri)?.use { inputStream ->
+                                        val tempFile = File(context.cacheDir, "temp_image.jpg")
+                                        tempFile.outputStream().use { outputStream ->
+                                            inputStream.copyTo(outputStream)
+                                        }
+                                        tempFile
+                                    }
+                                }
+
+                                if (file != null) {
+                                    val requestBody = file.asRequestBody("image/*".toMediaTypeOrNull())
+                                    val imagePart = MultipartBody.Part.createFormData("image", file.name, requestBody)
+
+                                    val res = NetworkClient.apiService.updateMyLandscapeWithImage(
+                                        landscapeId = landscapeId,
+                                        title = scenicName.trim().toRequestBody(),
+                                        content = scenicDetails.trim().toRequestBody(),
+                                        address = scenicLocation.trim().toRequestBody(),
+                                        latitude = latitude?.toString()?.toRequestBody(),
+                                        longitude = longitude?.toString()?.toRequestBody(),
+                                        contactPhone = contact.takeIf { it.isNotBlank() }?.toRequestBody(),
+                                        openingTime = openTime.takeIf { it.isNotBlank() }?.toRequestBody(),
+                                        level = scenicLevel.toRequestBody(),
+                                        image = imagePart
+                                    )
+                                    if (res.success) {
+                                        Toast.makeText(context, "已提交审核，请等待管理员处理", Toast.LENGTH_SHORT).show()
+                                        activity.finish()
+                                    } else {
+                                        Toast.makeText(context, res.message ?: "保存失败", Toast.LENGTH_SHORT).show()
+                                    }
+                                } else {
+                                    Toast.makeText(context, "图片处理失败", Toast.LENGTH_SHORT).show()
+                                }
                             } else {
-                                Toast.makeText(context, res.message ?: "保存失败", Toast.LENGTH_SHORT).show()
+                                // 没有选择新图片，使用原有的JSON接口
+                                val request = LandscapeRequest(
+                                    title = scenicName.trim(),
+                                    content = scenicDetails.trim(),
+                                    address = scenicLocation.trim(),
+                                    latitude = latitude,
+                                    longitude = longitude,
+                                    contactPhone = contact.takeIf { it.isNotBlank() },
+                                    openingTime = openTime.takeIf { it.isNotBlank() },
+                                    level = scenicLevel
+                                )
+                                val res = NetworkClient.apiService.updateMyLandscape(landscapeId, request)
+                                if (res.success) {
+                                    Toast.makeText(context, "已提交审核，请等待管理员处理", Toast.LENGTH_SHORT).show()
+                                    activity.finish()
+                                } else {
+                                    Toast.makeText(context, res.message ?: "保存失败", Toast.LENGTH_SHORT).show()
+                                }
                             }
                         } catch (e: Exception) {
                             Toast.makeText(context, "保存失败: ${e.message}", Toast.LENGTH_SHORT).show()

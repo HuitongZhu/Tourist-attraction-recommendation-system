@@ -229,8 +229,12 @@ fun PublishPostContent() {
 
         Button(
             onClick = {
-                if (title.isBlank() || content.isBlank()) {
-                    Toast.makeText(context, "请填写标题和推荐内容", Toast.LENGTH_SHORT).show()
+                if (title.isBlank()) {
+                    Toast.makeText(context, "标题不能为空", Toast.LENGTH_SHORT).show()
+                    return@Button
+                }
+                if (content.isBlank()) {
+                    Toast.makeText(context, "推荐内容不能为空", Toast.LENGTH_SHORT).show()
                     return@Button
                 }
                 if (selectedLandscapeId.isNullOrBlank()) {
@@ -253,7 +257,9 @@ fun PublishPostContent() {
                         val response = NetworkClient.apiService.publishPost(request)
                         if (response.success) {
                             Toast.makeText(context, "发布成功，等待管理员审核", Toast.LENGTH_SHORT).show()
-                            activity.finish()
+                            val intent = Intent(context, HomeActivity::class.java)
+                            intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+                            context.startActivity(intent)
                         } else {
                             Toast.makeText(context, response.message ?: "发布失败", Toast.LENGTH_SHORT).show()
                         }

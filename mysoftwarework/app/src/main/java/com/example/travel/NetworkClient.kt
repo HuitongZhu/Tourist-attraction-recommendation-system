@@ -11,7 +11,7 @@ object NetworkClient {
     // 1. 更新为后端最新的 IP 地址
     // 注意：Android模拟器访问本地服务器需要使用 10.0.2.2
     // 如果是真实设备测试，使用开发机的局域网IP（如 192.168.x.x）
-    const val BASE_URL = "http://10.100.197.153:8080/"
+    const val BASE_URL = "http://10.100.27.123:8080/"
 
     fun mediaUrl(path: String?): String? {
         if (path.isNullOrBlank()) return null

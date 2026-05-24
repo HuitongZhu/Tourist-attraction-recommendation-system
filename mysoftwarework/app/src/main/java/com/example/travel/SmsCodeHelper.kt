@@ -21,19 +21,28 @@ suspend fun sendSmsCodeAndShow(
     context: Context,
     phone: String,
     type: String,
-    onError: (String) -> Unit = {}
+    onMessage: (String) -> Unit = {}
 ): Boolean {
     val normalized = phone.trim()
     if (!PHONE_REGEX.matches(normalized)) {
-        onError("请输入正确的11位手机号")
+        onMessage("请输入正确的11位手机号")
         return false
     }
     val res = requestSmsCode(normalized, type)
-    return if (res != null && res.code == 200 && res.data != null && !res.data.smsCode.isNullOrBlank()) {
-        showSmsCodeDialog(context, res.data.smsCode, res.data.expiresInSeconds)
-        true
+    return if (res != null && res.code == 200) {
+        if (res.data != null && !res.data.smsCode.isNullOrBlank()) {
+            // 有验证码，显示弹窗并提示成功
+            showSmsCodeDialog(context, res.data.smsCode, res.data.expiresInSeconds)
+            onMessage("发送成功")
+            true
+        } else {
+            // 成功状态但无验证码，显示后端返回的消息
+            onMessage(res.message?.takeIf { it.isNotBlank() } ?: "发送成功")
+            true
+        }
     } else {
-        onError(res?.message?.takeIf { it.isNotBlank() } ?: "发送失败，请重启后端后重试")
+        // 失败状态，显示错误消息
+        onMessage(res?.message?.takeIf { it.isNotBlank() } ?: "发送失败，请重试")
         false
     }
 }
@@ -47,10 +56,12 @@ private suspend fun requestSmsCode(phone: String, type: String): ApiResponse<Sms
     for (call in attempts) {
         try {
             val res = call()
-            if (res.code == 200 && res.data?.smsCode != null) {
+            if (res.code == 200) {
+                // 成功状态码直接返回，让上层判断 smsCode 是否有效
                 return res
             }
-            if (res.message?.isNotBlank() == true && res.code != 200) {
+            if (res.message?.isNotBlank() == true) {
+                // 非成功状态但有错误消息，返回错误响应
                 return res
             }
         } catch (_: Exception) {

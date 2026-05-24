@@ -21,6 +21,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.travel.ui.theme.TravelTheme
+import kotlinx.coroutines.launch
 
 class PersonalHomeActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -47,25 +48,34 @@ class PersonalHomeActivity : ComponentActivity() {
 @Composable
 fun PersonalHomeScreen(onNavigate: (PageType) -> Unit) {
     var displayName by remember { mutableStateOf(NetworkClient.userName.orEmpty()) }
+    var isRefreshing by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
     val userTypeLabel = when (NetworkClient.userType) {
         "1" -> "管理员"
         else -> "普通用户"
     }
 
-    LaunchedEffect(Unit) {
-        if (displayName.isBlank()) {
-            try {
-                val res = NetworkClient.apiService.getCurrentUser()
-                if (res.success) {
-                    res.data?.userName?.let { name ->
-                        if (name.isNotBlank()) {
-                            displayName = name
-                            NetworkClient.userName = name
-                        }
+    suspend fun reloadProfile() {
+        isRefreshing = true
+        try {
+            val res = NetworkClient.apiService.getCurrentUser()
+            if (res.success) {
+                res.data?.userName?.let { name ->
+                    if (name.isNotBlank()) {
+                        displayName = name
+                        NetworkClient.userName = name
                     }
                 }
-            } catch (_: Exception) {
             }
+        } catch (_: Exception) {
+        } finally {
+            isRefreshing = false
+        }
+    }
+
+    LaunchedEffect(Unit) {
+        if (displayName.isBlank()) {
+            reloadProfile()
         }
     }
 
@@ -74,10 +84,16 @@ fun PersonalHomeScreen(onNavigate: (PageType) -> Unit) {
             currentPage = PageType.PERSONAL,
             onPageChange = onNavigate
         )
-        PersonalHomeContent(
-            displayName = displayName.ifBlank { "用户" },
-            userTypeLabel = userTypeLabel
-        )
+        PullToRefreshBox(
+            isRefreshing = isRefreshing,
+            onRefresh = { scope.launch { reloadProfile() } },
+            modifier = Modifier.weight(1f)
+        ) {
+            PersonalHomeContent(
+                displayName = displayName.ifBlank { "用户" },
+                userTypeLabel = userTypeLabel
+            )
+        }
     }
 }
 

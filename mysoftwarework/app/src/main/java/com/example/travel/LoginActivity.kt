@@ -120,15 +120,12 @@ class LoginActivity : ComponentActivity() {
                                     return@launch
                                 }
                                 try {
-                                    val ok = sendSmsCodeAndShow(
+                                    sendSmsCodeAndShow(
                                         context = this@LoginActivity,
                                         phone = phone,
                                         type = SmsCodeType.LOGIN,
-                                        onError = { msg -> showError(msg) }
+                                        onMessage = { msg -> showError(msg) }
                                     )
-                                    if (!ok) {
-                                        // onError 已处理
-                                    }
                                 } catch (e: Exception) {
                                     showError("网络异常")
                                 }
@@ -209,12 +206,10 @@ fun LoginScreen(
             )
 
             Spacer(modifier = Modifier.height(15.dp))
-            OutlinedTextField(
+            PasswordTextField(
                 value = password,
                 onValueChange = { password = it },
-                label = { Text("密码") },
-                visualTransformation = PasswordVisualTransformation(),
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                label = "密码",
                 modifier = Modifier.fillMaxWidth(0.8f)
             )
         } else {

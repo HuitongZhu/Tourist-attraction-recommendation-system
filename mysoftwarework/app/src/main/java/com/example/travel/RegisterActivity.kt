@@ -13,6 +13,9 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -25,6 +28,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.lifecycleScope
 import com.example.travel.ui.theme.TravelTheme
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 enum class UsernameStatus {
@@ -51,32 +55,34 @@ class RegisterActivity : ComponentActivity() {
                                         userName = regData.username,
                                         account = regData.phone,
                                         password = regData.password,
-                                        confirmPassword = regData.confirmPassword
+                                        confirmPassword = regData.confirmPassword,
+                                        code = regData.smsCode
                                     )
-                                    if (response.isSuccessful) {
+                                    if (response.success) {
                                         Toast.makeText(this@RegisterActivity, "注册成功", Toast.LENGTH_SHORT).show()
                                         finish()
                                     } else {
-                                        showError("注册失败")
+                                        showError(response.message ?: "注册失败")
                                     }
                                 } catch (e: Exception) {
                                     showError("网络连接失败")
                                 }
                             }
                         },
-                        onSendSmsClick = { phone, showError ->
+                        onSendSmsClick = { phone, showError, onSent ->
                             lifecycleScope.launch {
                                 if (phone.isEmpty()) {
                                     showError("请输入手机号")
                                     return@launch
                                 }
                                 try {
-                                    sendSmsCodeAndShow(
+                                    val success = sendSmsCodeAndShow(
                                         context = this@RegisterActivity,
                                         phone = phone,
                                         type = SmsCodeType.REGISTER,
-                                        onError = { msg -> showError(msg) }
+                                        onMessage = { msg -> showError(msg) }
                                     )
+                                    if (success) onSent()
                                 } catch (e: Exception) {
                                     showError("网络异常")
                                 }
@@ -108,7 +114,7 @@ fun RegisterScreen(
     modifier: Modifier = Modifier,
     onLoginClick: () -> Unit,
     onRegisterClick: (RegisterRequest, (String) -> Unit) -> Unit,
-    onSendSmsClick: (String, (String) -> Unit) -> Unit,
+    onSendSmsClick: (String, (String) -> Unit, () -> Unit) -> Unit,
     onCheckUsername: (String, (Boolean?, String?) -> Unit) -> Unit
 ) {
     var username by remember { mutableStateOf("") }
@@ -122,6 +128,14 @@ fun RegisterScreen(
     var birthday by remember { mutableStateOf("") }
     var errorMessage by remember { mutableStateOf("") }
     var usernameStatus by remember { mutableStateOf<UsernameStatus>(UsernameStatus.None) }
+    var smsCooldown by remember { mutableStateOf(0) }
+
+    LaunchedEffect(smsCooldown) {
+        if (smsCooldown > 0) {
+            delay(1000)
+            smsCooldown--
+        }
+    }
 
     Column(
         modifier = modifier
@@ -175,16 +189,20 @@ fun RegisterScreen(
             )
             Spacer(modifier = Modifier.width(10.dp))
             Button(
-                onClick = { 
+                onClick = {
                     errorMessage = ""
-                    onSendSmsClick(phone) { msg -> 
-                        errorMessage = msg 
-                    } 
+                    onSendSmsClick(phone, { msg -> errorMessage = msg }) {
+                        smsCooldown = 60
+                    }
                 },
+                enabled = smsCooldown == 0,
                 colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1A56DB)),
                 modifier = Modifier.height(56.dp)
             ) {
-                Text("获取验证码", fontSize = 12.sp)
+                Text(
+                    if (smsCooldown > 0) "${smsCooldown}秒" else "获取验证码",
+                    fontSize = 12.sp
+                )
             }
         }
 
@@ -292,16 +310,32 @@ fun CustomRegisterField(
     keyboardType: KeyboardType = KeyboardType.Text,
     status: UsernameStatus = UsernameStatus.None
 ) {
+    var passwordVisible by remember { mutableStateOf(false) }
+    
     Column(modifier = Modifier.fillMaxWidth(0.8f).padding(vertical = 6.dp)) {
         OutlinedTextField(
             value = value,
             onValueChange = onValueChange,
             label = { Text(label) },
-            visualTransformation = if (isPassword) PasswordVisualTransformation() else androidx.compose.ui.text.input.VisualTransformation.None,
+            visualTransformation = if (isPassword && !passwordVisible) PasswordVisualTransformation() else androidx.compose.ui.text.input.VisualTransformation.None,
             keyboardOptions = KeyboardOptions(keyboardType = keyboardType),
             modifier = Modifier.fillMaxWidth(),
             singleLine = true,
-            shape = RoundedCornerShape(12.dp)
+            shape = RoundedCornerShape(12.dp),
+            trailingIcon = if (isPassword) {
+                {
+                    val icon = if (passwordVisible) {
+                        Icons.Filled.Visibility
+                    } else {
+                        Icons.Filled.VisibilityOff
+                    }
+                    IconButton(onClick = { passwordVisible = !passwordVisible }) {
+                        Icon(icon, contentDescription = if (passwordVisible) "隐藏密码" else "显示密码")
+                    }
+                }
+            } else {
+                null
+            }
         )
         // 显示用户名检查状态
         if (status != UsernameStatus.None) {

@@ -44,6 +44,10 @@ class ChangePasswordActivity : ComponentActivity() {
                                     val response = NetworkClient.apiService.changePassword(oldPassword, newPassword)
                                     if (response.success) {
                                         Toast.makeText(this@ChangePasswordActivity, "密码修改成功", Toast.LENGTH_SHORT).show()
+                                        // 跳转到个人中心页面
+                                        val intent = Intent(this@ChangePasswordActivity, PersonalHomeActivity::class.java)
+                                        intent.flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_NEW_TASK
+                                        startActivity(intent)
                                         finish()
                                     } else {
                                         Toast.makeText(this@ChangePasswordActivity, "修改失败: ${response.message}", Toast.LENGTH_SHORT).show()
@@ -93,36 +97,30 @@ fun ChangePasswordScreen(
         Spacer(modifier = Modifier.height(40.dp))
         
         // 原密码
-        OutlinedTextField(
+        PasswordTextField(
             value = oldPassword,
             onValueChange = { oldPassword = it },
-            label = { Text("请输入原密码") },
-            visualTransformation = PasswordVisualTransformation(),
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+            label = "请输入原密码",
             modifier = Modifier.fillMaxWidth(0.85f)
         )
 
         Spacer(modifier = Modifier.height(16.dp))
         
         // 新密码
-        OutlinedTextField(
+        PasswordTextField(
             value = newPassword,
             onValueChange = { newPassword = it },
-            label = { Text("设置新密码") },
-            visualTransformation = PasswordVisualTransformation(),
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+            label = "设置新密码",
             modifier = Modifier.fillMaxWidth(0.85f)
         )
 
         Spacer(modifier = Modifier.height(16.dp))
         
         // 确认新密码
-        OutlinedTextField(
+        PasswordTextField(
             value = confirmPassword,
             onValueChange = { confirmPassword = it },
-            label = { Text("再次输入新密码") },
-            visualTransformation = PasswordVisualTransformation(),
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+            label = "再次输入新密码",
             modifier = Modifier.fillMaxWidth(0.85f)
         )
 
