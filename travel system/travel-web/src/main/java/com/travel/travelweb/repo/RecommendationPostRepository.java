@@ -4,6 +4,7 @@ import java.util.List;
 
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -21,7 +22,14 @@ public interface RecommendationPostRepository extends JpaRepository<Recommendati
     @Query("SELECT p FROM RecommendationPost p WHERE p.userId = :userId ORDER BY p.publishTime DESC")
     List<RecommendationPost> findByUserId(@Param("userId") String userId);
 
-    void deleteByUserId(String userId);
+    // 查询某景点下的所有推荐帖
+    List<RecommendationPost> findByLandscapeId(String landscapeId);
 
-    void deleteByLandscapeId(String landscapeId);
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("DELETE FROM RecommendationPost p WHERE p.userId = :userId")
+    void deleteByUserId(@Param("userId") String userId);
+
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("DELETE FROM RecommendationPost p WHERE p.landscapeId = :landscapeId")
+    void deleteByLandscapeId(@Param("landscapeId") String landscapeId);
 }

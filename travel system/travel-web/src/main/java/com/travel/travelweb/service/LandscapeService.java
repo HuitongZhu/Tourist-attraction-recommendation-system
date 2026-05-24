@@ -20,9 +20,13 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import com.travel.travelweb.entity.Landscape;
+import com.travel.travelweb.entity.RecommendationPost;
+import com.travel.travelweb.repo.CollectRepository;
+import com.travel.travelweb.repo.CommentRepository;
 import com.travel.travelweb.repo.LandCollectRepository;
 import com.travel.travelweb.repo.LandCommentRepository;
 import com.travel.travelweb.repo.LandLikeRepository;
+import com.travel.travelweb.repo.LikeRepository;
 import com.travel.travelweb.repo.LandscapeRepository;
 import com.travel.travelweb.repo.PostCollectRepository;
 import com.travel.travelweb.repo.PostCommentRepository;
@@ -45,6 +49,11 @@ public class LandscapeService {
     private final PostCommentRepository postCommentRepository;
     private final PostLikeRepository postLikeRepository;
     private final PostCollectRepository postCollectRepository;
+    private final PostService postService;
+    private final RecommendationPostService recommendationPostService;
+    private final CommentRepository commentRepository;
+    private final LikeRepository likeRepository;
+    private final CollectRepository collectRepository;
 
     public LandscapeService(LandscapeRepository landscapeRepository, LandLikeRepository landLikeRepository,
                            LandCommentRepository landCommentRepository,
@@ -52,7 +61,12 @@ public class LandscapeService {
                            RecommendationPostRepository postRepository,
                            PostCommentRepository postCommentRepository,
                            PostLikeRepository postLikeRepository,
-                           PostCollectRepository postCollectRepository) {
+                           PostCollectRepository postCollectRepository,
+                           PostService postService,
+                           RecommendationPostService recommendationPostService,
+                           CommentRepository commentRepository,
+                           LikeRepository likeRepository,
+                           CollectRepository collectRepository) {
         this.landscapeRepository = landscapeRepository;
         this.landLikeRepository = landLikeRepository;
         this.landCommentRepository = landCommentRepository;
@@ -61,6 +75,11 @@ public class LandscapeService {
         this.postCommentRepository = postCommentRepository;
         this.postLikeRepository = postLikeRepository;
         this.postCollectRepository = postCollectRepository;
+        this.postService = postService;
+        this.recommendationPostService = recommendationPostService;
+        this.commentRepository = commentRepository;
+        this.likeRepository = likeRepository;
+        this.collectRepository = collectRepository;
     }
 
     public List<Landscape> homeLandscapes(int limit) {
@@ -71,6 +90,23 @@ public class LandscapeService {
     public List<Landscape> listApproved() {
         return landscapeRepository.findByAuditStateOrderByPublishTimeDesc(
                 AUDIT_APPROVED, PageRequest.of(0, Integer.MAX_VALUE));
+    }
+
+    public List<String> getCities() {
+        return landscapeRepository.findByAuditStateOrderByPublishTimeDesc(
+                AUDIT_APPROVED, PageRequest.of(0, Integer.MAX_VALUE))
+                .stream()
+                .map(l -> {
+                    String address = l.getAddress();
+                    if (address != null && address.length() >= 2) {
+                        return address.substring(0, 2);
+                    }
+                    return "";
+                })
+                .filter(city -> !city.isEmpty())
+                .distinct()
+                .sorted()
+                .collect(Collectors.toList());
     }
 
     public Optional<Landscape> findApproved(String id) {
@@ -291,30 +327,56 @@ public class LandscapeService {
         }
         // 删除图片文件
         deleteImage(l.getImagePath());
-        // 删除关联的推荐帖及其评论、点赞、收藏
-        postRepository.deleteByLandscapeId(landscapeId);
-        // 删除景点的收藏、评论和点赞
+        
+        // 获取该景点下的所有推荐帖，逐个删除（包括关联的评论、点赞、收藏）
+        List<RecommendationPost> posts = postRepository.findByLandscapeId(landscapeId);
+        for (RecommendationPost post : posts) {
+            postService.deletePost(post.getRecomId(), post.getUserId());
+        }
+        
+        // 先删除通用表（通过子查询关联业务专属表，必须先删）
+        collectRepository.deleteByLandscapeId(landscapeId);
+        likeRepository.deleteByLandscapeId(landscapeId);
+        commentRepository.deleteByLandscapeId(landscapeId);
+        
+        // 再删除景点专属表
         landCollectRepository.deleteByLandscapeId(landscapeId);
         landLikeRepository.deleteByLandscapeId(landscapeId);
         landCommentRepository.deleteByLandscapeId(landscapeId);
-        // 删除景点
-        landscapeRepository.delete(l);
+        
+        // 使用 deleteById 而不是 delete(entity)，避免缓存问题
+        landscapeRepository.deleteById(landscapeId);
     }
 
     @Transactional
     public boolean deleteLandscapeByAdmin(String landscapeId) {
-        return landscapeRepository.findById(landscapeId).map(l -> {
-            // 删除图片文件
-            deleteImage(l.getImagePath());
-            // 先删除关联的推荐帖及其评论、点赞、收藏
-            postRepository.deleteByLandscapeId(landscapeId);
-            // 删除景点的收藏、评论和点赞
-            landCollectRepository.deleteByLandscapeId(landscapeId);
-            landLikeRepository.deleteByLandscapeId(landscapeId);
-            landCommentRepository.deleteByLandscapeId(landscapeId);
-            // 删除景点
-            landscapeRepository.delete(l);
-            return true;
-        }).orElse(false);
+        // 先检查景点是否存在
+        Landscape l = landscapeRepository.findById(landscapeId).orElse(null);
+        if (l == null) {
+            return false;
+        }
+        // 删除图片文件
+        deleteImage(l.getImagePath());
+        
+        // 获取该景点下的所有推荐帖，逐个删除（包括关联的评论、点赞、收藏）
+        List<RecommendationPost> posts = postRepository.findByLandscapeId(landscapeId);
+        for (RecommendationPost post : posts) {
+            // 使用推荐帖服务的删除方法
+            recommendationPostService.deletePost(post.getRecomId());
+        }
+        
+        // 先删除通用表（通过子查询关联业务专属表，必须先删）
+        collectRepository.deleteByLandscapeId(landscapeId);
+        likeRepository.deleteByLandscapeId(landscapeId);
+        commentRepository.deleteByLandscapeId(landscapeId);
+        
+        // 再删除景点专属表
+        landCollectRepository.deleteByLandscapeId(landscapeId);
+        landLikeRepository.deleteByLandscapeId(landscapeId);
+        landCommentRepository.deleteByLandscapeId(landscapeId);
+        
+        // 使用 deleteById 而不是 delete(entity)，避免缓存问题
+        landscapeRepository.deleteById(landscapeId);
+        return true;
     }
 }

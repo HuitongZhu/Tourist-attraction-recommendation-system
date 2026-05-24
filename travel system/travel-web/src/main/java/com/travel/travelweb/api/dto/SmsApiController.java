@@ -38,13 +38,14 @@ public class SmsApiController {
         }
         String normalized = phone.trim();
         try {
-            String code = switch (type == null ? "" : type.toLowerCase()) {
+            switch (type == null ? "" : type.toLowerCase()) {
                 case "register" -> authService.sendRegisterSmsCode(normalized);
                 case "password" -> userProfileService.sendPasswordCode(normalized);
                 case "delete" -> userProfileService.sendDeleteCode(normalized);
                 case "forgot", "login" -> authService.sendSmsCode(normalized);
                 default -> authService.sendSmsCode(normalized);
-            };
+            }
+            String code = "******";
             SmsCodeResponse data = new SmsCodeResponse(normalized, code, EXPIRE_SECONDS);
             return ResponseEntity.ok(ApiResponse.success(data));
         } catch (IllegalArgumentException e) {

@@ -35,10 +35,7 @@
             <label>城市（地址包含）</label>
             <select class="layui-select" name="city" style="height:38px;width:100%">
                 <option value="all" th:selected="${city == 'all'}">全部</option>
-                <option value="南京" th:selected="${city == '南京'}">南京</option>
-                <option value="苏州" th:selected="${city == '苏州'}">苏州</option>
-                <option value="杭州" th:selected="${city == '杭州'}">杭州</option>
-                <option value="黄山" th:selected="${city == '黄山'}">黄山</option>
+                <option th:each="cityItem : ${cities}" th:value="${cityItem}" th:selected="${city == cityItem}" th:text="${cityItem}"></option>
             </select>
         </div>
         <div style="width:160px">
@@ -48,6 +45,7 @@
                 <option value="AAAAA" th:selected="${level == 'AAAAA'}">AAAAA</option>
                 <option value="AAAA" th:selected="${level == 'AAAA'}">AAAA</option>
                 <option value="AAA" th:selected="${level == 'AAA'}">AAA</option>
+                <option value="其他" th:selected="${level == '其他'}">其他</option>
             </select>
         </div>
         <input type="hidden" name="sort" th:value="${sort}"/>

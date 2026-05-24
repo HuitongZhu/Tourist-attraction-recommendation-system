@@ -45,10 +45,13 @@ D:\travel system\travel-web\src\main\java\com\travel\travelweb\config\LoginInter
 D:\travel system\travel-web\src\main\java\com\travel\travelweb\config\PasswordConfig.java
 D:\travel system\travel-web\src\main\java\com\travel\travelweb\config\WebMvcConfig.java
 D:\travel system\travel-web\src\main\java\com\travel\travelweb\entity\Administrator.java
+D:\travel system\travel-web\src\main\java\com\travel\travelweb\entity\Collect.java
+D:\travel system\travel-web\src\main\java\com\travel\travelweb\entity\Comment.java
 D:\travel system\travel-web\src\main\java\com\travel\travelweb\entity\LandCollect.java
 D:\travel system\travel-web\src\main\java\com\travel\travelweb\entity\LandComment.java
 D:\travel system\travel-web\src\main\java\com\travel\travelweb\entity\LandLike.java
 D:\travel system\travel-web\src\main\java\com\travel\travelweb\entity\Landscape.java
+D:\travel system\travel-web\src\main\java\com\travel\travelweb\entity\Like.java
 D:\travel system\travel-web\src\main\java\com\travel\travelweb\entity\OrdinaryUser.java
 D:\travel system\travel-web\src\main\java\com\travel\travelweb\entity\PostCollect.java
 D:\travel system\travel-web\src\main\java\com\travel\travelweb\entity\PostComment.java
@@ -56,10 +59,13 @@ D:\travel system\travel-web\src\main\java\com\travel\travelweb\entity\PostLike.j
 D:\travel system\travel-web\src\main\java\com\travel\travelweb\entity\RecommendationPost.java
 D:\travel system\travel-web\src\main\java\com\travel\travelweb\entity\SysUser.java
 D:\travel system\travel-web\src\main\java\com\travel\travelweb\repo\AdministratorRepository.java
+D:\travel system\travel-web\src\main\java\com\travel\travelweb\repo\CollectRepository.java
+D:\travel system\travel-web\src\main\java\com\travel\travelweb\repo\CommentRepository.java
 D:\travel system\travel-web\src\main\java\com\travel\travelweb\repo\LandCollectRepository.java
 D:\travel system\travel-web\src\main\java\com\travel\travelweb\repo\LandCommentRepository.java
 D:\travel system\travel-web\src\main\java\com\travel\travelweb\repo\LandLikeRepository.java
 D:\travel system\travel-web\src\main\java\com\travel\travelweb\repo\LandscapeRepository.java
+D:\travel system\travel-web\src\main\java\com\travel\travelweb\repo\LikeRepository.java
 D:\travel system\travel-web\src\main\java\com\travel\travelweb\repo\OrdinaryUserRepository.java
 D:\travel system\travel-web\src\main\java\com\travel\travelweb\repo\PostCollectRepository.java
 D:\travel system\travel-web\src\main\java\com\travel\travelweb\repo\PostCommentRepository.java
@@ -69,6 +75,8 @@ D:\travel system\travel-web\src\main\java\com\travel\travelweb\repo\SysUserRepos
 D:\travel system\travel-web\src\main\java\com\travel\travelweb\service\AliyunSmsService.java
 D:\travel system\travel-web\src\main\java\com\travel\travelweb\service\AmapService.java
 D:\travel system\travel-web\src\main\java\com\travel\travelweb\service\AuthService.java
+D:\travel system\travel-web\src\main\java\com\travel\travelweb\service\CollectMigrationService.java
+D:\travel system\travel-web\src\main\java\com\travel\travelweb\service\CommentMigrationService.java
 D:\travel system\travel-web\src\main\java\com\travel\travelweb\service\LandCommentService.java
 D:\travel system\travel-web\src\main\java\com\travel\travelweb\service\LandInteractionService.java
 D:\travel system\travel-web\src\main\java\com\travel\travelweb\service\LandscapeService.java

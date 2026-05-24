@@ -10,8 +10,12 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.travel.travelweb.entity.Comment;
 import com.travel.travelweb.entity.PostComment;
 import com.travel.travelweb.entity.RecommendationPost;
+import com.travel.travelweb.repo.CollectRepository;
+import com.travel.travelweb.repo.CommentRepository;
+import com.travel.travelweb.repo.LikeRepository;
 import com.travel.travelweb.repo.LandscapeRepository;
 import com.travel.travelweb.repo.PostCollectRepository;
 import com.travel.travelweb.repo.PostCommentRepository;
@@ -33,6 +37,9 @@ public class PostService {
     private final PostCollectRepository postCollectRepository;
     private final SysUserRepository sysUserRepository;
     private final LandscapeRepository landscapeRepository;
+    private final CommentRepository commentRepository;
+    private final LikeRepository likeRepository;
+    private final CollectRepository collectRepository;
 
     public PostService(
             RecommendationPostRepository postRepository,
@@ -40,13 +47,19 @@ public class PostService {
             PostLikeRepository postLikeRepository,
             PostCollectRepository postCollectRepository,
             SysUserRepository sysUserRepository,
-            LandscapeRepository landscapeRepository) {
+            LandscapeRepository landscapeRepository,
+            CommentRepository commentRepository,
+            LikeRepository likeRepository,
+            CollectRepository collectRepository) {
         this.postRepository = postRepository;
         this.postCommentRepository = postCommentRepository;
         this.postLikeRepository = postLikeRepository;
         this.postCollectRepository = postCollectRepository;
         this.sysUserRepository = sysUserRepository;
         this.landscapeRepository = landscapeRepository;
+        this.commentRepository = commentRepository;
+        this.likeRepository = likeRepository;
+        this.collectRepository = collectRepository;
     }
 
     public List<RecommendationPost> homePosts(int limit) {
@@ -90,13 +103,21 @@ public class PostService {
         if (content == null || content.isBlank()) {
             throw new IllegalArgumentException("评论不能为空");
         }
+        String commentId = IdGenerator.next("PCM");
         PostComment c = new PostComment();
-        c.setCommentId(IdGenerator.next("PCM"));
+        c.setCommentId(commentId);
         c.setRecomId(recomId);
         c.setUserId(userId);
         c.setContent(content.trim());
         c.setPublishTime(LocalDateTime.now());
         postCommentRepository.save(c);
+        
+        Comment comment = new Comment();
+        comment.setCommentId(commentId);
+        comment.setUserId(userId);
+        comment.setContent(content.trim());
+        comment.setPublishTime(LocalDateTime.now());
+        commentRepository.save(comment);
     }
 
     public Optional<String> findRecomIdForComment(String commentId) {
@@ -116,6 +137,12 @@ public class PostService {
         c.setContent(content.trim());
         c.setPublishTime(LocalDateTime.now());
         postCommentRepository.save(c);
+        
+        commentRepository.findById(commentId).ifPresent(comment -> {
+            comment.setContent(content.trim());
+            comment.setPublishTime(LocalDateTime.now());
+            commentRepository.save(comment);
+        });
     }
 
     @Transactional
@@ -125,12 +152,14 @@ public class PostService {
             throw new IllegalArgumentException("无权删除该评论");
         }
         postCommentRepository.delete(c);
+        commentRepository.deleteById(commentId);
     }
 
     @Transactional
     public boolean deleteCommentByAdmin(String commentId) {
         return postCommentRepository.findById(commentId).map(c -> {
             postCommentRepository.delete(c);
+            commentRepository.deleteById(commentId);
             return true;
         }).orElse(false);
     }
@@ -199,6 +228,12 @@ public class PostService {
             long collectCount = postCollectRepository.countByRecomId(recomId);
             logger.info("关联数据 - 评论:{}, 点赞:{}, 收藏:{}", commentCount, likeCount, collectCount);
 
+            // 先删除通用表（通过子查询关联业务专属表，必须先删）
+            commentRepository.deleteByRecomId(recomId);
+            likeRepository.deleteByRecomId(recomId);
+            collectRepository.deleteByRecomId(recomId);
+
+            // 再删除推荐帖专属表的评论、点赞、收藏
             postCommentRepository.deleteByRecomId(recomId);
             logger.info("已删除评论");
 
@@ -208,7 +243,7 @@ public class PostService {
             postCollectRepository.deleteByRecomId(recomId);
             logger.info("已删除收藏");
 
-            postRepository.delete(post);
+            postRepository.deleteById(recomId);
             logger.info("帖子删除成功");
         } catch (Exception e) {
             logger.error("删除帖子失败, recomId={}, userId={}", recomId, userId, e);
@@ -222,6 +257,15 @@ public class PostService {
         }
         return landscapeRepository.findById(landscapeId)
                 .map(l -> "审核通过".equals(l.getAuditState()) ? l.getTitle() : null)
+                .orElse(null);
+    }
+
+    public String getLandscapeTitleForAdmin(String landscapeId) {
+        if (landscapeId == null || landscapeId.isBlank()) {
+            return null;
+        }
+        return landscapeRepository.findById(landscapeId)
+                .map(l -> l.getTitle())
                 .orElse(null);
     }
 }

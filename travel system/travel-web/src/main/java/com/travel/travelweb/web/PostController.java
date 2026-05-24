@@ -4,6 +4,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -13,6 +14,8 @@ import org.springframework.web.bind.annotation.RequestParam;
 
 import com.travel.travelweb.config.LoginInterceptor;
 import com.travel.travelweb.entity.RecommendationPost;
+import com.travel.travelweb.entity.SysUser;
+import com.travel.travelweb.repo.SysUserRepository;
 import com.travel.travelweb.service.LandscapeService;
 import com.travel.travelweb.service.PostInteractionService;
 import com.travel.travelweb.service.PostService;
@@ -25,11 +28,13 @@ public class PostController {
     private final PostService postService;
     private final PostInteractionService postInteractionService;
     private final LandscapeService landscapeService;
+    private final SysUserRepository sysUserRepository;
 
-    public PostController(PostService postService, PostInteractionService postInteractionService, LandscapeService landscapeService) {
+    public PostController(PostService postService, PostInteractionService postInteractionService, LandscapeService landscapeService, SysUserRepository sysUserRepository) {
         this.postService = postService;
         this.postInteractionService = postInteractionService;
         this.landscapeService = landscapeService;
+        this.sysUserRepository = sysUserRepository;
     }
 
     @GetMapping("/posts")
@@ -117,6 +122,12 @@ public class PostController {
         }
         model.addAttribute("landscapeTitle", landscapeTitle);
         
+        // 获取发布用户的用户名
+        String userName = sysUserRepository.findById(post.getUserId())
+                .map(u -> u.getUserName() != null ? u.getUserName() : u.getUserId())
+                .orElse(post.getUserId());
+        model.addAttribute("postUserName", userName);
+        
         model.addAttribute("comments", postService.comments(id));
         model.addAttribute("navKey", "posts");
         model.addAttribute("loginUserId", userId);
@@ -135,7 +146,22 @@ public class PostController {
         if (p.isEmpty()) {
             return "redirect:/admin";
         }
-        model.addAttribute("post", p.get());
+        RecommendationPost post = p.get();
+        model.addAttribute("post", post);
+        
+        // 获取关联景点名称（管理员可以查看所有状态的景点）
+        String landscapeTitle = null;
+        if (post.getLandscapeId() != null && !post.getLandscapeId().isBlank()) {
+            landscapeTitle = postService.getLandscapeTitleForAdmin(post.getLandscapeId());
+        }
+        model.addAttribute("landscapeTitle", landscapeTitle);
+        
+        // 获取发布用户的用户名
+        String userName = sysUserRepository.findById(post.getUserId())
+                .map(u -> u.getUserName() != null ? u.getUserName() : u.getUserId())
+                .orElse(post.getUserId());
+        model.addAttribute("postUserName", userName);
+        
         model.addAttribute("comments", postService.comments(id));
         return "admin-post-detail";
     }
@@ -205,7 +231,7 @@ public class PostController {
     }
 
     @PostMapping("/posts/delete/{id}")
-    public String delete(@PathVariable String id, HttpSession session) {
+    public String delete(@PathVariable String id, HttpSession session, org.springframework.web.servlet.mvc.support.RedirectAttributes ra) {
         String userId = (String) session.getAttribute(LoginInterceptor.SESSION_USER_ID);
         if (userId == null) {
             return "redirect:/login?next=/post/my";
@@ -213,7 +239,9 @@ public class PostController {
         try {
             postService.deletePost(id, userId);
         } catch (IllegalArgumentException e) {
-            // 忽略错误
+            ra.addFlashAttribute("msg", e.getMessage());
+        } catch (DataIntegrityViolationException e) {
+            ra.addFlashAttribute("msg", "删除失败，该帖子存在关联数据（点赞、评论等），无法直接删除");
         }
         return "redirect:/post/my";
     }

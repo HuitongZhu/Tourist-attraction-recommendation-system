@@ -4,6 +4,7 @@ import java.util.List;
 
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -19,7 +20,7 @@ public interface LandscapeRepository extends JpaRepository<Landscape, String> {
             AND (:kw IS NULL OR :kw = '' OR l.title LIKE CONCAT('%', :kw, '%')
                  OR l.address LIKE CONCAT('%', :kw, '%') OR l.content LIKE CONCAT('%', :kw, '%'))
             AND (:city IS NULL OR :city = '' OR :city = 'all' OR l.address LIKE CONCAT('%', :city, '%'))
-            AND (:level IS NULL OR :level = '' OR :level = 'all' OR l.level = :level)
+            AND (:level IS NULL OR :level = '' OR :level = 'all' OR l.level = :level OR (:level = '其他' AND l.level NOT IN ('AAAAA', 'AAAA', 'AAA')))
             ORDER BY l.publishTime DESC
             """)
     List<Landscape> searchApproved(
@@ -46,7 +47,9 @@ public interface LandscapeRepository extends JpaRepository<Landscape, String> {
             """)
     List<Landscape> findByUserId(@Param("userId") String userId);
 
-    void deleteByUserId(String userId);
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("DELETE FROM Landscape l WHERE l.userId = :userId")
+    void deleteByUserId(@Param("userId") String userId);
     
     @Query("""
             SELECT COUNT(l) FROM Landscape l

@@ -2,7 +2,7 @@
 <html lang="zh-CN" xmlns:th="http://www.thymeleaf.org">
 <head>
     <meta charset="UTF-8"/>
-    <title th:text="${post.tag}">推荐帖详情</title>
+    <title th:text="${post.title}">推荐帖详情</title>
     <link rel="stylesheet" th:href="@{/css/app.css}"/>
     <link rel="stylesheet" href="https://cdn.staticfile.org/layui/2.9.10/css/layui.css"/>
     <style>
@@ -107,8 +107,18 @@
     <div th:if="${msg}" class="alert alert-info" th:text="${msg}"></div>
     <div th:if="${error}" class="alert alert-error" th:text="${error}"></div>
     <div class="card">
-        <h1 style="margin:0 0 12px;font-size:22px" th:text="${post.tag}">标题</h1>
-        <p class="muted" th:text="'发布用户：' + ${post.userId} + ' | ' + ${#temporals.format(post.publishTime, 'yyyy-MM-dd HH:mm')}">时间</p>
+        <h1 style="margin:0 0 12px;font-size:22px" th:text="${post.title}">标题</h1>
+        <div th:if="${landscapeTitle != null}" style="margin-bottom:12px;">
+            <span style="background:#e8f5e9;color:#2e7d32;padding:4px 10px;border-radius:4px;font-size:13px">
+                关联景点：[[${landscapeTitle}]]
+            </span>
+        </div>
+        <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px;" th:if="${post.tag != null and post.tag != ''}">
+            <th:block th:each="tagItem : ${post.tag.split(',')}">
+                <span style="background:#e8f0fe;color:#1a56db;padding:4px 10px;border-radius:4px;font-size:12px" th:text="'#' + ${tagItem.trim()}"></span>
+            </th:block>
+        </div>
+        <p class="muted" th:text="'发布用户：' + ${postUserName} + ' | ' + ${#temporals.format(post.publishTime, 'yyyy-MM-dd HH:mm')}">时间</p>
         <div style="white-space:pre-wrap;line-height:1.8;margin-top:16px" th:text="${post.content}">正文</div>
     </div>
     <div class="card">

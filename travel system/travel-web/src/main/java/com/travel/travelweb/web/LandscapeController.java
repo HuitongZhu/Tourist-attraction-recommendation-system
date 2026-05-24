@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -187,7 +188,7 @@ public class LandscapeController {
     }
 
     @PostMapping("/landscapes/delete/{id}")
-    public String delete(@PathVariable String id, HttpSession session) {
+    public String delete(@PathVariable String id, HttpSession session, RedirectAttributes ra) {
         String userId = (String) session.getAttribute(LoginInterceptor.SESSION_USER_ID);
         if (userId == null) {
             return "redirect:/login?next=/my/published";
@@ -195,7 +196,9 @@ public class LandscapeController {
         try {
             landscapeService.deleteLandscape(id, userId);
         } catch (IllegalArgumentException e) {
-            // 忽略错误
+            ra.addFlashAttribute("msg", e.getMessage());
+        } catch (DataIntegrityViolationException e) {
+            ra.addFlashAttribute("msg", "删除失败，该景点存在关联数据（推荐帖、点赞、评论等），无法直接删除");
         }
         return "redirect:/my/published";
     }

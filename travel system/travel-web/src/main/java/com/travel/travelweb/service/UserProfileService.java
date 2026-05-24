@@ -3,10 +3,12 @@ package com.travel.travelweb.service;
 import com.travel.travelweb.entity.OrdinaryUser;
 import com.travel.travelweb.entity.SysUser;
 import com.travel.travelweb.repo.*;
+import jakarta.persistence.EntityManager;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
 import java.util.Optional;
 
 @Service
@@ -20,6 +22,12 @@ public class UserProfileService {
     private final LandscapeRepository landscapeRepository;
     private final PostCommentRepository postCommentRepository;
     private final RecommendationPostRepository recommendationPostRepository;
+    private final PostCollectRepository postCollectRepository;
+    private final PostLikeRepository postLikeRepository;
+    private final CommentRepository commentRepository;
+    private final LikeRepository likeRepository;
+    private final CollectRepository collectRepository;
+    private final EntityManager entityManager;
     private final PasswordEncoder passwordEncoder;
     private final AliyunSmsService aliyunSmsService;
     private final SmsCodeCacheService smsCodeCacheService;
@@ -32,6 +40,12 @@ public class UserProfileService {
                              LandscapeRepository landscapeRepository,
                              PostCommentRepository postCommentRepository,
                              RecommendationPostRepository recommendationPostRepository,
+                             PostCollectRepository postCollectRepository,
+                             PostLikeRepository postLikeRepository,
+                             CommentRepository commentRepository,
+                             LikeRepository likeRepository,
+                             CollectRepository collectRepository,
+                             EntityManager entityManager,
                              PasswordEncoder passwordEncoder,
                              AliyunSmsService aliyunSmsService,
                              SmsCodeCacheService smsCodeCacheService) {
@@ -43,6 +57,12 @@ public class UserProfileService {
         this.landscapeRepository = landscapeRepository;
         this.postCommentRepository = postCommentRepository;
         this.recommendationPostRepository = recommendationPostRepository;
+        this.postCollectRepository = postCollectRepository;
+        this.postLikeRepository = postLikeRepository;
+        this.commentRepository = commentRepository;
+        this.likeRepository = likeRepository;
+        this.collectRepository = collectRepository;
+        this.entityManager = entityManager;
         this.passwordEncoder = passwordEncoder;
         this.aliyunSmsService = aliyunSmsService;
         this.smsCodeCacheService = smsCodeCacheService;
@@ -178,13 +198,84 @@ public class UserProfileService {
             throw new IllegalArgumentException("用户ID不能为空");
         }
         
+        // 删除用户的评论、点赞、收藏（通用表）
+        commentRepository.deleteByUserId(userId);
+        likeRepository.deleteByUserId(userId);
+        collectRepository.deleteByUserId(userId);
+        
+        // 删除用户的景点收藏、评论、点赞
         landCollectRepository.deleteByUserId(userId);
         landCommentRepository.deleteByUserId(userId);
+        entityManager.flush();
+        entityManager.clear();
+        
         landLikeRepository.deleteByUserId(userId);
-        landscapeRepository.deleteByUserId(userId);
+        
+        // 删除用户发布的景点及其关联的推荐帖
+        List<com.travel.travelweb.entity.Landscape> landscapes = landscapeRepository.findByUserId(userId);
+        for (com.travel.travelweb.entity.Landscape landscape : landscapes) {
+            String landscapeId = landscape.getLandscapeId();
+            
+            // 删除景点关联的推荐帖及其评论、点赞、收藏
+            List<com.travel.travelweb.entity.RecommendationPost> posts = recommendationPostRepository.findByLandscapeId(landscapeId);
+            for (com.travel.travelweb.entity.RecommendationPost post : posts) {
+                // 先删除通用表
+                commentRepository.deleteByRecomId(post.getRecomId());
+                likeRepository.deleteByRecomId(post.getRecomId());
+                collectRepository.deleteByRecomId(post.getRecomId());
+                // 再删除业务专属表
+                postCommentRepository.deleteByRecomId(post.getRecomId());
+                postLikeRepository.deleteByRecomId(post.getRecomId());
+                postCollectRepository.deleteByRecomId(post.getRecomId());
+                recommendationPostRepository.deleteById(post.getRecomId());
+            }
+            
+            // 先删除通用表（通过子查询关联业务专属表，必须先删）
+            collectRepository.deleteByLandscapeId(landscapeId);
+            likeRepository.deleteByLandscapeId(landscapeId);
+            commentRepository.deleteByLandscapeId(landscapeId);
+            
+            // 再删除景点专属表
+            landCollectRepository.deleteByLandscapeId(landscapeId);
+            landLikeRepository.deleteByLandscapeId(landscapeId);
+            landCommentRepository.deleteByLandscapeId(landscapeId);
+            
+            // 删除景点
+            landscapeRepository.deleteById(landscapeId);
+        }
+        
+        // 删除用户的推荐帖评论、点赞、收藏
         postCommentRepository.deleteByUserId(userId);
-        recommendationPostRepository.deleteByUserId(userId);
+        postLikeRepository.deleteByUserId(userId);
+        postCollectRepository.deleteByUserId(userId);
+        
+        // 删除通用表中用户的评论、点赞、收藏
+        commentRepository.deleteByUserId(userId);
+        likeRepository.deleteByUserId(userId);
+        collectRepository.deleteByUserId(userId);
+        
+        // 删除用户发布的推荐帖（未关联景点的）
+        List<com.travel.travelweb.entity.RecommendationPost> posts = recommendationPostRepository.findByUserId(userId);
+        for (com.travel.travelweb.entity.RecommendationPost post : posts) {
+            // 先删除通用表（通过子查询关联业务专属表，必须先删）
+            commentRepository.deleteByRecomId(post.getRecomId());
+            likeRepository.deleteByRecomId(post.getRecomId());
+            collectRepository.deleteByRecomId(post.getRecomId());
+            
+            // 再删除推荐帖专属表的评论、点赞、收藏
+            postCommentRepository.deleteByRecomId(post.getRecomId());
+            postLikeRepository.deleteByRecomId(post.getRecomId());
+            postCollectRepository.deleteByRecomId(post.getRecomId());
+            
+            recommendationPostRepository.deleteById(post.getRecomId());
+        }
+        
+        // 删除用户详情
         ordinaryUserRepository.deleteByUserId(userId);
+        entityManager.flush();
+        entityManager.clear();
+        
+        // 删除用户主表
         sysUserRepository.deleteById(userId);
     }
 

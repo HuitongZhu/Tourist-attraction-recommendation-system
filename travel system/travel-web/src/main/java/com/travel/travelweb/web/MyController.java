@@ -24,6 +24,7 @@ import com.travel.travelweb.repo.LandscapeRepository;
 import com.travel.travelweb.repo.PostCollectRepository;
 import com.travel.travelweb.repo.PostLikeRepository;
 import com.travel.travelweb.repo.RecommendationPostRepository;
+import com.travel.travelweb.service.LandscapeService;
 
 import jakarta.servlet.http.HttpSession;
 
@@ -34,6 +35,7 @@ public class MyController {
     private final LandCollectRepository landCollectRepository;
     private final LandLikeRepository landLikeRepository;
     private final LandscapeRepository landscapeRepository;
+    private final LandscapeService landscapeService;
     private final PostCollectRepository postCollectRepository;
     private final PostLikeRepository postLikeRepository;
     private final RecommendationPostRepository recommendationPostRepository;
@@ -42,12 +44,14 @@ public class MyController {
             LandCollectRepository landCollectRepository,
             LandLikeRepository landLikeRepository,
             LandscapeRepository landscapeRepository,
+            LandscapeService landscapeService,
             PostCollectRepository postCollectRepository,
             PostLikeRepository postLikeRepository,
             RecommendationPostRepository recommendationPostRepository) {
         this.landCollectRepository = landCollectRepository;
         this.landLikeRepository = landLikeRepository;
         this.landscapeRepository = landscapeRepository;
+        this.landscapeService = landscapeService;
         this.postCollectRepository = postCollectRepository;
         this.postLikeRepository = postLikeRepository;
         this.recommendationPostRepository = recommendationPostRepository;
@@ -62,6 +66,7 @@ public class MyController {
             landscapeRepository.findById(c.getLandscapeId()).ifPresent(landscapes::add);
         }
         model.addAttribute("landscapes", landscapes);
+        model.addAttribute("cities", landscapeService.getCities());
         model.addAttribute("tab", "collect");
         model.addAttribute("navKey", "my");
         return "my-landmarks";
@@ -77,6 +82,7 @@ public class MyController {
             l.ifPresent(landscapes::add);
         }
         model.addAttribute("landscapes", landscapes);
+        model.addAttribute("cities", landscapeService.getCities());
         model.addAttribute("tab", "like");
         model.addAttribute("navKey", "my");
         return "my-landmarks";
@@ -87,6 +93,7 @@ public class MyController {
         String uid = (String) session.getAttribute(LoginInterceptor.SESSION_USER_ID);
         List<Landscape> landscapes = landscapeRepository.findByUserId(uid);
         model.addAttribute("landscapes", landscapes);
+        model.addAttribute("cities", landscapeService.getCities());
         model.addAttribute("tab", "published");
         model.addAttribute("navKey", "my");
         return "my-landmarks";

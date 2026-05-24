@@ -6,8 +6,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
-import org.springframework.http.ResponseEntity;
 import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -29,6 +29,7 @@ import com.travel.travelweb.entity.SysUser;
 import com.travel.travelweb.repo.LandCommentRepository;
 import com.travel.travelweb.repo.LandLikeRepository;
 import com.travel.travelweb.repo.LandscapeRepository;
+import com.travel.travelweb.repo.PostCollectRepository;
 import com.travel.travelweb.repo.PostCommentRepository;
 import com.travel.travelweb.repo.PostLikeRepository;
 import com.travel.travelweb.repo.SysUserRepository;
@@ -53,6 +54,7 @@ public class MyContentController {
     private final LandCommentRepository landCommentRepository;
     private final PostLikeRepository postLikeRepository;
     private final PostCommentRepository postCommentRepository;
+    private final PostCollectRepository postCollectRepository;
 
     public MyContentController(
             LandscapeRepository landscapeRepository,
@@ -64,7 +66,8 @@ public class MyContentController {
             LandLikeRepository landLikeRepository,
             LandCommentRepository landCommentRepository,
             PostLikeRepository postLikeRepository,
-            PostCommentRepository postCommentRepository) {
+            PostCommentRepository postCommentRepository,
+            PostCollectRepository postCollectRepository) {
         this.landscapeRepository = landscapeRepository;
         this.landscapeService = landscapeService;
         this.amapService = amapService;
@@ -75,6 +78,7 @@ public class MyContentController {
         this.landCommentRepository = landCommentRepository;
         this.postLikeRepository = postLikeRepository;
         this.postCommentRepository = postCommentRepository;
+        this.postCollectRepository = postCollectRepository;
     }
 
     /** 当前用户发布的全部景点（含各审核状态） */

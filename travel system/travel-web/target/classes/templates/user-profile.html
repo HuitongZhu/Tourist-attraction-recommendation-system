@@ -652,14 +652,23 @@
                         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
                         body: 'type=password&value=' + encodeURIComponent(pwd)
                     })
-                    .then(response => response.json())
+                    .then(response => {
+                        if (!response.ok) {
+                            throw new Error('网络请求失败: ' + response.status);
+                        }
+                        return response.json();
+                    })
                     .then(data => {
                         if (data.success) {
                             alert('账号已成功注销');
                             window.location.href = '/login';
                         } else {
-                            errorMsg.textContent = data.message;
+                            errorMsg.textContent = data.message || '注销失败';
                         }
+                    })
+                    .catch(error => {
+                        console.error('注销请求失败:', error);
+                        errorMsg.textContent = '注销请求失败，请稍后重试';
                     });
                 } else {
                     const code = content.querySelector('#smsCode').value;
@@ -673,14 +682,23 @@
                         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
                         body: 'type=sms&value=' + encodeURIComponent(code)
                     })
-                    .then(response => response.json())
+                    .then(response => {
+                        if (!response.ok) {
+                            throw new Error('网络请求失败: ' + response.status);
+                        }
+                        return response.json();
+                    })
                     .then(data => {
                         if (data.success) {
                             alert('账号已成功注销');
                             window.location.href = '/login';
                         } else {
-                            errorMsg.textContent = data.message;
+                            errorMsg.textContent = data.message || '注销失败';
                         }
+                    })
+                    .catch(error => {
+                        console.error('注销请求失败:', error);
+                        errorMsg.textContent = '注销请求失败，请稍后重试';
                     });
                 }
             });
